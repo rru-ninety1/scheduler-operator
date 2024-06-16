@@ -1,0 +1,12 @@
+apiVersion: crd.rru.io/v1alpha1
+kind: Schedulation
+metadata:
+  labels:
+    app.kubernetes.io/name: schedulation
+    app.kubernetes.io/instance: schedulation-sample
+    app.kubernetes.io/part-of: scheduler-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: scheduler-operator
+  name: schedulation-sample
+spec:
+  # TODO(user): Add fields here

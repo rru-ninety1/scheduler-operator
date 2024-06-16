@@ -1,0 +1,31 @@
+# permissions for end users to edit schedulations.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: schedulation-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: scheduler-operator
+    app.kubernetes.io/part-of: scheduler-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: schedulation-editor-role
+rules:
+- apiGroups:
+  - crd.rru.io
+  resources:
+  - schedulations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - crd.rru.io
+  resources:
+  - schedulations/status
+  verbs:
+  - get
