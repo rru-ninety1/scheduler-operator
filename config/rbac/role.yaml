@@ -5,8 +5,8 @@ metadata:
     app.kubernetes.io/name: clusterrole
     app.kubernetes.io/instance: manager-role
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: src
-    app.kubernetes.io/part-of: src
+    app.kubernetes.io/created-by: scheduler-operator
+    app.kubernetes.io/part-of: scheduler-operator
     app.kubernetes.io/managed-by: kustomize
   name: manager-role
 rules:

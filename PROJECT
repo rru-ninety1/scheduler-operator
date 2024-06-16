@@ -2,12 +2,12 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
-domain: rru.com
+domain: rru.io
 layout:
 - go.kubebuilder.io/v4
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
-projectName: src
+projectName: scheduler-operator
 repo: github.com/rru-ninety1/scheduler-operator
 version: "3"
