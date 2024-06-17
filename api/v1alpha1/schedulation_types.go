@@ -60,8 +60,8 @@ type ScheduledResource struct {
 
 // SchedulationStatus defines the observed state of Schedulation
 type SchedulationStatus struct {
-	// Status of the schedulation. Can be `Running`, `Executed`, `Error`, `Scheduled`
-	Status string `json:"status,omitempty"`
+	// Status of the schedulation. Can be `Running`, `Executed`, `Error`, `Waiting`
+	CurrentStatus string `json:"currentStatus,omitempty"`
 
 	// Error message, in case of error
 	Error string `json:"error,omitempty"`

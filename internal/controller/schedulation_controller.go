@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -47,11 +48,59 @@ type SchedulationReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
 func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	log := log.FromContext(ctx)
 
 	// TODO(user): your logic here
+	// Get the schedulation object
+	schedulation := &crdv1alpha1.Schedulation{}
+	if err := r.Get(ctx, req.NamespacedName, schedulation); err != nil {
+		log.Error(err, "unable to fetch Schedulation")
 
-	return ctrl.Result{}, nil
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	if !schedulation.Spec.Suspended {
+		// The schedulation is not suspended
+
+		// Get current hour
+		currentHour := time.Now().Hour()
+
+		isExecutionTime := false
+		if schedulation.Spec.StartHour <= currentHour && schedulation.Spec.EndHour >= currentHour {
+			// Now is beetwen the start and end time
+			isExecutionTime = true
+		}
+
+		switch schedulation.Status.CurrentStatus {
+		case "Running":
+			// The schedulation is running
+			//TODO: controllare se lo stato desiderato è stato raggiunto, in quel caso impostare lo stato a Executed
+		case "Executed":
+			// The schedulation is executed
+			if !isExecutionTime {
+				// Change the status to Waiting
+				schedulation.Status.CurrentStatus = "Waiting"
+			}
+		case "Error":
+			// The schedulation is in error
+			if !isExecutionTime {
+				// Change the status to Waiting
+				schedulation.Status.CurrentStatus = "Waiting"
+			}
+		case "Waiting":
+			// The schedulation is waiting
+			if isExecutionTime {
+				//TODO: eseguire la schedulazione
+			}
+		}
+
+		//TODO gestire schedulazioni one shot
+	}
+
+	//TODO: se necessario, controllare la cancellazione e cosa fare in quel caso
+
+	// Requeue after 10 minutes
+	return ctrl.Result{RequeueAfter: time.Minute * 10}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
