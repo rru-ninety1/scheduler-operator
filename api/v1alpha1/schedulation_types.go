@@ -33,12 +33,12 @@ type SchedulationSpec struct {
 	// Schedulation start hour
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=23
-	StartHour int `json:"startHour,omitempty"`
+	StartHour int32 `json:"startHour,omitempty"`
 
 	// Schedulation end hour
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=23
-	EndHour int `json:"endHour,omitempty"`
+	EndHour int32 `json:"endHour,omitempty"`
 
 	// Resources to control
 	Resources []ScheduledResource `json:"resources,omitempty"`
@@ -49,7 +49,7 @@ type ScheduledResource struct {
 	Type string `json:"type,omitempty"`
 
 	// Number of replicas of the resource to maintain for the scheduled period
-	ReplicaCount int `json:"replicaCount,omitempty"`
+	ReplicaCount int32 `json:"replicaCount,omitempty"`
 
 	// Namespace of the resource
 	Namespace string `json:"namespace,omitempty"`
