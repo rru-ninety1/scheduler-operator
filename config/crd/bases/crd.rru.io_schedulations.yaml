@@ -1,0 +1,96 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: schedulations.crd.rru.io
+spec:
+  group: crd.rru.io
+  names:
+    kind: Schedulation
+    listKind: SchedulationList
+    plural: schedulations
+    singular: schedulation
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Schedulation is the Schema for the schedulations API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: SchedulationSpec defines the desired state of Schedulation
+            properties:
+              endHour:
+                description: Schedulation end hour
+                maximum: 23
+                minimum: 0
+                type: integer
+              oneShot:
+                description: Schedulation must be executed only one time
+                type: boolean
+              resources:
+                description: Resources to control
+                items:
+                  properties:
+                    name:
+                      description: Name of the resource
+                      type: string
+                    namespace:
+                      description: Namespace of the resource
+                      type: string
+                    replicaCount:
+                      description: Number of replicas of the resource to maintain
+                        for the scheduled period
+                      type: integer
+                    type:
+                      description: '`Deployment` or `StatefulSet`'
+                      type: string
+                  type: object
+                type: array
+              startHour:
+                description: Schedulation start hour
+                maximum: 23
+                minimum: 0
+                type: integer
+              suspended:
+                description: Schedulation suspended
+                type: boolean
+            type: object
+          status:
+            description: SchedulationStatus defines the observed state of Schedulation
+            properties:
+              error:
+                description: Error message, in case of error
+                type: string
+              lastExecutionTime:
+                description: Last execution time
+                type: string
+              status:
+                description: Status of the schedulation. Can be `Running`, `Executed`,
+                  `Error`, `Scheduled`
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

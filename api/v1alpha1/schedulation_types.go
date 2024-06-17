@@ -20,22 +20,54 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // SchedulationSpec defines the desired state of Schedulation
 type SchedulationSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of Schedulation. Edit schedulation_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Schedulation suspended
+	Suspended bool `json:"suspended,omitempty"`
+
+	// Schedulation must be executed only one time
+	OneShot bool `json:"oneShot,omitempty"`
+
+	// Schedulation start hour
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=23
+	StartHour int `json:"startHour,omitempty"`
+
+	// Schedulation end hour
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=23
+	EndHour int `json:"endHour,omitempty"`
+
+	// Resources to control
+	Resources []ScheduledResource `json:"resources,omitempty"`
+}
+
+type ScheduledResource struct {
+	// `Deployment` or `StatefulSet`
+	Type string `json:"type,omitempty"`
+
+	// Number of replicas of the resource to maintain for the scheduled period
+	ReplicaCount int `json:"replicaCount,omitempty"`
+
+	// Namespace of the resource
+	Namespace string `json:"namespace,omitempty"`
+
+	// Name of the resource
+	Name string `json:"name,omitempty"`
 }
 
 // SchedulationStatus defines the observed state of Schedulation
 type SchedulationStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Status of the schedulation. Can be `Running`, `Executed`, `Error`, `Scheduled`
+	Status string `json:"status,omitempty"`
+
+	// Error message, in case of error
+	Error string `json:"error,omitempty"`
+
+	// Last execution time
+	LastExecutionTime string `json:"lastExecutionTime,omitempty"`
 }
 
 //+kubebuilder:object:root=true
