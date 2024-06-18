@@ -41,6 +41,7 @@ spec:
             properties:
               endHour:
                 description: Schedulation end hour
+                format: int32
                 maximum: 23
                 minimum: 0
                 type: integer
@@ -60,14 +61,20 @@ spec:
                     replicaCount:
                       description: Number of replicas of the resource to maintain
                         for the scheduled period
+                      format: int32
                       type: integer
                     type:
-                      description: '`Deployment` or `StatefulSet`'
+                      description: Type of the resource to control. Can be `Deployment`
+                        or `StatefulSet`
+                      enum:
+                      - Deployment
+                      - StatefulSet
                       type: string
                   type: object
                 type: array
               startHour:
                 description: Schedulation start hour
+                format: int32
                 maximum: 23
                 minimum: 0
                 type: integer
@@ -78,15 +85,21 @@ spec:
           status:
             description: SchedulationStatus defines the observed state of Schedulation
             properties:
-              currentStatus:
-                description: Status of the schedulation. Can be `Running`, `Executed`,
-                  `Error`, `Waiting`
-                type: string
               error:
                 description: Error message, in case of error
                 type: string
+              executionStatus:
+                description: Status of the schedulation. Can be `Running`, `Executed`,
+                  `Error`, `Waiting`
+                enum:
+                - Running
+                - Executed
+                - Error
+                - Waiting
+                type: string
               lastExecutionTime:
                 description: Last execution time
+                format: date-time
                 type: string
             type: object
         type: object

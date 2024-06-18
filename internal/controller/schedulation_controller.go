@@ -20,37 +20,34 @@ import (
 	"context"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/go-logr/logr"
 	crdv1alpha1 "github.com/rru-ninety1/scheduler-operator/api/v1alpha1"
 )
 
 // SchedulationReconciler reconciles a Schedulation object
 type SchedulationReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 //+kubebuilder:rbac:groups=crd.rru.io,resources=schedulations,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=crd.rru.io,resources=schedulations/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=crd.rru.io,resources=schedulations/finalizers,verbs=update
+//+kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Schedulation object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
 func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	// TODO(user): your logic here
 	// Get the schedulation object
 	schedulation := &crdv1alpha1.Schedulation{}
 	if err := r.Get(ctx, req.NamespacedName, schedulation); err != nil {
@@ -63,7 +60,7 @@ func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// The schedulation is not suspended
 
 		// Get current hour
-		currentHour := time.Now().Hour()
+		currentHour := int32(time.Now().Hour())
 
 		isExecutionTime := false
 		if schedulation.Spec.StartHour <= currentHour && schedulation.Spec.EndHour >= currentHour {
@@ -71,36 +68,73 @@ func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			isExecutionTime = true
 		}
 
-		switch schedulation.Status.CurrentStatus {
-		case "Running":
+		switch schedulation.Status.SchedulationExecutionStatus {
+		case crdv1alpha1.SchedulationExecutionStatusRunning:
 			// The schedulation is running
-			//TODO: controllare se lo stato desiderato è stato raggiunto, in quel caso impostare lo stato a Executed
-		case "Executed":
+			//TODO: controllare se lo stato desiderato è stato raggiunto
+
+			// Change the status to Executed and set the last execution time
+			schedulation.Status.SchedulationExecutionStatus = crdv1alpha1.SchedulationExecutionStatusExecuted
+			now := metav1.Now()
+			schedulation.Status.LastExecutionTime = &now
+
+			// Update the schedulation status
+			r.UpdateSchedulationStatus(ctx, log, schedulation)
+
+			// Record event SchedulationExecuted
+			r.Recorder.Event(schedulation, "Normal", "SchedulationExecuted", "Schedulation executed")
+
+		case crdv1alpha1.SchedulationExecutionStatusExecuted:
 			// The schedulation is executed
 			if !isExecutionTime {
 				// Change the status to Waiting
-				schedulation.Status.CurrentStatus = "Waiting"
+				schedulation.Status.SchedulationExecutionStatus = crdv1alpha1.SchedulationExecutionStatusWaiting
+
+				// Update the schedulation status
+				r.UpdateSchedulationStatus(ctx, log, schedulation)
 			}
-		case "Error":
+
+		case crdv1alpha1.SchedulationExecutionStatusError:
 			// The schedulation is in error
 			if !isExecutionTime {
 				// Change the status to Waiting
-				schedulation.Status.CurrentStatus = "Waiting"
+				schedulation.Status.SchedulationExecutionStatus = crdv1alpha1.SchedulationExecutionStatusWaiting
+
+				// Update the schedulation status
+				r.UpdateSchedulationStatus(ctx, log, schedulation)
 			}
-		case "Waiting":
+
+		case crdv1alpha1.SchedulationExecutionStatusWaiting:
 			// The schedulation is waiting
 			if isExecutionTime {
+				// Record event SchedulationStarted
+				r.Recorder.Event(schedulation, "Normal", "SchedulationStarted", "Schedulation started")
+
+				// Change the status to Running
+				schedulation.Status.SchedulationExecutionStatus = crdv1alpha1.SchedulationExecutionStatusRunning
+
+				// Update the schedulation status
+				r.UpdateSchedulationStatus(ctx, log, schedulation)
+
 				//TODO: eseguire la schedulazione
 			}
 		}
 
 		//TODO gestire schedulazioni one shot
+		//TODO impostare lo stato di errore alla schedulazione quando necessario
 	}
 
 	//TODO: se necessario, controllare la cancellazione e cosa fare in quel caso
 
 	// Requeue after 10 minutes
 	return ctrl.Result{RequeueAfter: time.Minute * 10}, nil
+}
+
+// UpdateSchedulationStatus updates the status of the schedulation
+func (r *SchedulationReconciler) UpdateSchedulationStatus(ctx context.Context, log logr.Logger, schedulation *crdv1alpha1.Schedulation) {
+	if err := r.Status().Update(ctx, schedulation); err != nil {
+		log.Error(err, "unable to update Schedulation status")
+	}
 }
 
 // SetupWithManager sets up the controller with the Manager.

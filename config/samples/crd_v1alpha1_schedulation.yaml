@@ -1,12 +1,23 @@
 apiVersion: crd.rru.io/v1alpha1
 kind: Schedulation
 metadata:
-  labels:
-    app.kubernetes.io/name: schedulation
-    app.kubernetes.io/instance: schedulation-sample
-    app.kubernetes.io/part-of: scheduler-operator
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/created-by: scheduler-operator
-  name: schedulation-sample
+  name: example-schedulation
+  namespace: default
 spec:
-  # TODO(user): Add fields here
+  endHour: 18
+  oneShot: false
+  resources:
+    - name: example-resource
+      namespace: default
+      replicaCount: 3
+      type: Deployment
+    - name: example-statefulset
+      namespace: default
+      replicaCount: 2
+      type: StatefulSet      
+  startHour: 9
+  suspended: false
+status:
+  error: ""
+  executionStatus: Waiting
+  lastExecutionTime: "2022-01-01T00:00:00Z"

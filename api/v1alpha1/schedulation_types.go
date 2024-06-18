@@ -45,8 +45,8 @@ type SchedulationSpec struct {
 }
 
 type ScheduledResource struct {
-	// `Deployment` or `StatefulSet`
-	Type string `json:"type,omitempty"`
+	// Type of the resource to control. Can be `Deployment` or `StatefulSet`
+	Type ResourceType `json:"type,omitempty"`
 
 	// Number of replicas of the resource to maintain for the scheduled period
 	ReplicaCount int32 `json:"replicaCount,omitempty"`
@@ -58,17 +58,48 @@ type ScheduledResource struct {
 	Name string `json:"name,omitempty"`
 }
 
+// ResourceType defines the type of the resource to control
+// +kubebuilder:validation:Enum=Deployment;StatefulSet
+// +kubebuilder:default=Deployment
+type ResourceType string
+
+const (
+	ResourceTypeDeployment ResourceType = "Deployment"
+
+	ResourceTypeStatefulSet ResourceType = "StatefulSet"
+)
+
 // SchedulationStatus defines the observed state of Schedulation
 type SchedulationStatus struct {
 	// Status of the schedulation. Can be `Running`, `Executed`, `Error`, `Waiting`
-	CurrentStatus string `json:"currentStatus,omitempty"`
+	SchedulationExecutionStatus SchedulationExecutionStatus `json:"executionStatus,omitempty"`
 
 	// Error message, in case of error
 	Error string `json:"error,omitempty"`
 
 	// Last execution time
-	LastExecutionTime string `json:"lastExecutionTime,omitempty"`
+	// +optional
+	LastExecutionTime *metav1.Time `json:"lastExecutionTime,omitempty"`
 }
+
+// SchedulationExecutionStatus defines the possible status of a schedulation
+// +kubebuilder:validation:Enum=Running;Executed;Error;Waiting
+// +kubebuilder:default=Waiting
+type SchedulationExecutionStatus string
+
+const (
+	// The schedulation is running
+	SchedulationExecutionStatusRunning SchedulationExecutionStatus = "Running"
+
+	// The schedulation has been executed
+	SchedulationExecutionStatusExecuted SchedulationExecutionStatus = "Executed"
+
+	// The schedulation has an error
+	SchedulationExecutionStatusError SchedulationExecutionStatus = "Error"
+
+	// The schedulation is waiting to be executed
+	SchedulationExecutionStatusWaiting SchedulationExecutionStatus = "Waiting"
+)
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
