@@ -66,6 +66,45 @@ make uninstall
 make undeploy
 ```
 
+### Test with KIND
+
+Create cluster
+```sh
+kind create cluster
+```
+
+Install CRD
+```sh
+make install
+```
+
+Run operator locally
+```sh
+make run
+```
+
+Apply CR
+```sh
+kubectl apply -f config/samples/crd_v1alpha1_schedulation.yaml
+kubectl describe Schedulation example-schedulation
+```
+
+Delete CR
+```sh
+kubectl delete Schedulation example-schedulation
+```
+
+Delete CRD
+```sh
+make uninstall
+```
+
+Delete cluster
+```sh
+kind delete cluster
+```
+
+
 ## Contributing
 // TODO(user): Add detailed information on how you would like others to contribute to this project
 

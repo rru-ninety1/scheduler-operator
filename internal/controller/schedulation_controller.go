@@ -38,6 +38,10 @@ type SchedulationReconciler struct {
 	Recorder record.EventRecorder
 }
 
+const (
+	OneShotExecutedSchedulationDeleteTime = time.Minute * 2
+)
+
 //+kubebuilder:rbac:groups=crd.rru.io,resources=schedulations,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=crd.rru.io,resources=schedulations/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=crd.rru.io,resources=schedulations/finalizers,verbs=update
@@ -48,12 +52,20 @@ type SchedulationReconciler struct {
 func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
+	//TODO: rimuovere
+	log.Info("reconcile " + req.NamespacedName.String())
+
 	// Get the schedulation object
 	schedulation := &crdv1alpha1.Schedulation{}
 	if err := r.Get(ctx, req.NamespacedName, schedulation); err != nil {
 		log.Error(err, "unable to fetch Schedulation")
 
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// If the schedulation status is not set, set it to Waiting
+	if schedulation.Status.SchedulationExecutionStatus == "" {
+		schedulation.Status.SchedulationExecutionStatus = crdv1alpha1.SchedulationExecutionStatusWaiting
 	}
 
 	if !schedulation.Spec.Suspended {
@@ -84,9 +96,28 @@ func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			// Record event SchedulationExecuted
 			r.Recorder.Event(schedulation, "Normal", "SchedulationExecuted", "Schedulation executed")
 
+			if schedulation.Spec.OneShot {
+				// The schedulation is one shot
+				//TODO: spostare
+				// Requeue the schedulation to be deleted
+				return ctrl.Result{RequeueAfter: OneShotExecutedSchedulationDeleteTime}, nil
+			}
+
 		case crdv1alpha1.SchedulationExecutionStatusExecuted:
 			// The schedulation is executed
-			if !isExecutionTime {
+			if schedulation.Spec.OneShot {
+				// The schedulation is one shot
+				lastExecution := schedulation.Status.LastExecutionTime.Time
+				if time.Now().After(lastExecution.Add(OneShotExecutedSchedulationDeleteTime)) {
+					// Last execution time is 2 minutes ago
+					// Delete the schedulation
+					if err := r.Delete(ctx, schedulation); err != nil {
+						log.Error(err, "unable to delete Schedulation")
+
+						return ctrl.Result{}, err
+					}
+				}
+			} else if !isExecutionTime {
 				// Change the status to Waiting
 				schedulation.Status.SchedulationExecutionStatus = crdv1alpha1.SchedulationExecutionStatusWaiting
 
@@ -120,7 +151,6 @@ func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			}
 		}
 
-		//TODO gestire schedulazioni one shot
 		//TODO impostare lo stato di errore alla schedulazione quando necessario
 	}
 
