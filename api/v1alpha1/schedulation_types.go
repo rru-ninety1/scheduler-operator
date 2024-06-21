@@ -56,6 +56,9 @@ type ScheduledResource struct {
 
 	// Name of the resource
 	Name string `json:"name,omitempty"`
+
+	// Processing order of the resource
+	Order int32 `json:"order,omitempty"`
 }
 
 // ResourceType defines the type of the resource to control

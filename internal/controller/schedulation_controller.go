@@ -47,13 +47,9 @@ const (
 //+kubebuilder:rbac:groups=crd.rru.io,resources=schedulations/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
 func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	// Get the logger
 	log := log.FromContext(ctx)
-
-	//TODO: rimuovere
-	log.Info("reconcile " + req.NamespacedName.String())
 
 	// Get the schedulation object
 	schedulation := &crdv1alpha1.Schedulation{}
@@ -76,31 +72,37 @@ func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		isExecutionTime := false
 		if schedulation.Spec.StartHour <= currentHour && schedulation.Spec.EndHour >= currentHour {
-			// Now is beetwen the start and end time
+			// Now is beetwen the start and end time of the schedulation
 			isExecutionTime = true
 		}
 
 		switch schedulation.Status.SchedulationExecutionStatus {
 		case crdv1alpha1.SchedulationExecutionStatusRunning:
 			// The schedulation is running
-			//TODO: controllare se lo stato desiderato è stato raggiunto
+			executed, err := CheckSchedulationDesiredState(schedulation)
+			if err != nil {
+				log.Error(err, "Error checking Schedulation desired state")
 
-			// Change the status to Executed and set the last execution time
-			schedulation.Status.SchedulationExecutionStatus = crdv1alpha1.SchedulationExecutionStatusExecuted
-			now := metav1.Now()
-			schedulation.Status.LastExecutionTime = &now
+				//TODO impostare la condizione di errore
+			} else if executed {
+				// The desired state is reached
+				// Change the status to Executed and set the last execution time
+				schedulation.Status.SchedulationExecutionStatus = crdv1alpha1.SchedulationExecutionStatusExecuted
+				now := metav1.Now()
+				schedulation.Status.LastExecutionTime = &now
 
-			// Update the schedulation status
-			r.UpdateSchedulationStatus(ctx, log, schedulation)
+				// Update the schedulation status
+				r.UpdateSchedulationStatus(ctx, log, schedulation)
 
-			// Record event SchedulationExecuted
-			r.Recorder.Event(schedulation, "Normal", "SchedulationExecuted", "Schedulation executed")
+				// Record event SchedulationExecuted
+				r.Recorder.Event(schedulation, "Normal", "SchedulationExecuted", "Schedulation executed")
 
-			if schedulation.Spec.OneShot {
-				// The schedulation is one shot
-				//TODO: spostare
-				// Requeue the schedulation to be deleted
-				return ctrl.Result{RequeueAfter: OneShotExecutedSchedulationDeleteTime}, nil
+				if schedulation.Spec.OneShot {
+					// The schedulation is one shot
+					//TODO: spostare
+					// Requeue the schedulation to be deleted
+					return ctrl.Result{RequeueAfter: OneShotExecutedSchedulationDeleteTime}, nil
+				}
 			}
 
 		case crdv1alpha1.SchedulationExecutionStatusExecuted:
@@ -154,10 +156,15 @@ func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		//TODO impostare lo stato di errore alla schedulazione quando necessario
 	}
 
-	//TODO: se necessario, controllare la cancellazione e cosa fare in quel caso
-
 	// Requeue after 10 minutes
 	return ctrl.Result{RequeueAfter: time.Minute * 10}, nil
+}
+
+// CheckSchedulationDesiredState checks if the desired state of the schedulation is reached
+func CheckSchedulationDesiredState(schedulation *crdv1alpha1.Schedulation) (bool, error) {
+	//TODO: controllare se lo stato desiderato è stato raggiunto
+
+	return true, nil
 }
 
 // UpdateSchedulationStatus updates the status of the schedulation
