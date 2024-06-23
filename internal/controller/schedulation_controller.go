@@ -59,9 +59,30 @@ func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// If the schedulation status is not set, set it to Waiting
-	if schedulation.Status.SchedulationExecutionStatus == "" {
-		schedulation.Status.SchedulationExecutionStatus = crdv1alpha1.SchedulationExecutionStatusWaiting
+	// Set default status conditions if not set
+	schedulation.Status.SetDefaultConditionsIfNotSet()
+
+	if schedulation.Spec.OneShot {
+		// The schedulation is one shot
+		// Get executed condition
+		executedCondition := schedulation.Status.GetExecutedCondition()
+
+		if executedCondition.Status == metav1.ConditionTrue {
+			// The schedulation is executed
+			lastExecution := schedulation.Status.LastExecutionTime.Time
+			if time.Now().After(lastExecution.Add(OneShotExecutedSchedulationDeleteTime)) {
+				// It's time to delete the schedulation
+				// Delete the schedulation
+				if err := r.Delete(ctx, schedulation); err != nil {
+					log.Error(err, "unable to delete Schedulation")
+
+					return ctrl.Result{}, err
+				}
+			}
+
+			// Requeue the schedulation to be deleted
+			return ctrl.Result{RequeueAfter: OneShotExecutedSchedulationDeleteTime}, nil
+		}
 	}
 
 	if !schedulation.Spec.Suspended {
@@ -70,105 +91,118 @@ func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		// Get current hour
 		currentHour := int32(time.Now().Hour())
 
-		isExecutionTime := false
 		if schedulation.Spec.StartHour <= currentHour && schedulation.Spec.EndHour >= currentHour {
 			// Now is beetwen the start and end time of the schedulation
-			isExecutionTime = true
+			return r.reconcileExecutionTime(ctx, log, schedulation)
+		} else {
+			return r.reconcileNotExecutionTime(ctx, log, schedulation)
 		}
 
-		switch schedulation.Status.SchedulationExecutionStatus {
-		case crdv1alpha1.SchedulationExecutionStatusRunning:
-			// The schedulation is running
-			executed, err := CheckSchedulationDesiredState(schedulation)
-			if err != nil {
-				log.Error(err, "Error checking Schedulation desired state")
-
-				//TODO impostare la condizione di errore
-			} else if executed {
-				// The desired state is reached
-				// Change the status to Executed and set the last execution time
-				schedulation.Status.SchedulationExecutionStatus = crdv1alpha1.SchedulationExecutionStatusExecuted
-				now := metav1.Now()
-				schedulation.Status.LastExecutionTime = &now
-
-				// Update the schedulation status
-				r.UpdateSchedulationStatus(ctx, log, schedulation)
-
-				// Record event SchedulationExecuted
-				r.Recorder.Event(schedulation, "Normal", "SchedulationExecuted", "Schedulation executed")
-
-				if schedulation.Spec.OneShot {
-					// The schedulation is one shot
-					//TODO: spostare
-					// Requeue the schedulation to be deleted
-					return ctrl.Result{RequeueAfter: OneShotExecutedSchedulationDeleteTime}, nil
-				}
-			}
-
-		case crdv1alpha1.SchedulationExecutionStatusExecuted:
-			// The schedulation is executed
-			if schedulation.Spec.OneShot {
-				// The schedulation is one shot
-				lastExecution := schedulation.Status.LastExecutionTime.Time
-				if time.Now().After(lastExecution.Add(OneShotExecutedSchedulationDeleteTime)) {
-					// Last execution time is 2 minutes ago
-					// Delete the schedulation
-					if err := r.Delete(ctx, schedulation); err != nil {
-						log.Error(err, "unable to delete Schedulation")
-
-						return ctrl.Result{}, err
-					}
-				}
-			} else if !isExecutionTime {
-				// Change the status to Waiting
-				schedulation.Status.SchedulationExecutionStatus = crdv1alpha1.SchedulationExecutionStatusWaiting
-
-				// Update the schedulation status
-				r.UpdateSchedulationStatus(ctx, log, schedulation)
-			}
-
-		case crdv1alpha1.SchedulationExecutionStatusError:
-			// The schedulation is in error
-			if !isExecutionTime {
-				// Change the status to Waiting
-				schedulation.Status.SchedulationExecutionStatus = crdv1alpha1.SchedulationExecutionStatusWaiting
-
-				// Update the schedulation status
-				r.UpdateSchedulationStatus(ctx, log, schedulation)
-			}
-
-		case crdv1alpha1.SchedulationExecutionStatusWaiting:
-			// The schedulation is waiting
-			if isExecutionTime {
-				// Record event SchedulationStarted
-				r.Recorder.Event(schedulation, "Normal", "SchedulationStarted", "Schedulation started")
-
-				// Change the status to Running
-				schedulation.Status.SchedulationExecutionStatus = crdv1alpha1.SchedulationExecutionStatusRunning
-
-				// Update the schedulation status
-				r.UpdateSchedulationStatus(ctx, log, schedulation)
-
-				//TODO: eseguire la schedulazione
-			}
-		}
-
-		//TODO impostare lo stato di errore alla schedulazione quando necessario
 	}
 
 	// Requeue after 10 minutes
 	return ctrl.Result{RequeueAfter: time.Minute * 10}, nil
 }
 
-// CheckSchedulationDesiredState checks if the desired state of the schedulation is reached
-func CheckSchedulationDesiredState(schedulation *crdv1alpha1.Schedulation) (bool, error) {
+func (r *SchedulationReconciler) reconcileExecutionTime(ctx context.Context, log logr.Logger, schedulation *crdv1alpha1.Schedulation) (ctrl.Result, error) {
+
+	if schedulation.Status.GetStartedCondition().Status != metav1.ConditionTrue {
+		// The schedulation is not started
+		// Update the conditions
+		schedulation.Status.SetStartedCondition(metav1.ConditionTrue, "Started", "The schedulation is started")
+		schedulation.Status.SetExecutedCondition(metav1.ConditionFalse, "NotExecuted", "The schedulation is not executed")
+		schedulation.Status.SetErrorCondition(metav1.ConditionFalse, "NoError", "The schedulation has no error")
+
+		if err := r.Status().Update(ctx, schedulation); err != nil {
+			log.Error(err, "unable to update Schedulation status")
+
+			return ctrl.Result{}, err
+		}
+
+		// Record event SchedulationStarted
+		r.Recorder.Event(schedulation, "Normal", "SchedulationStarted", "Schedulation started")
+
+		// Run the schedulation
+		return r.runSchedulation(ctx, log, schedulation)
+
+	} else if schedulation.Status.GetExecutedCondition().Status != metav1.ConditionTrue {
+		// The schedulation is started but not executed
+
+		//TODO vedere a che punto è la schedulazione
+		//proseguire con l'esecuzione
+		return r.runSchedulation(ctx, log, schedulation)
+	}
+
+	// Requeue after 10 minutes
+	return ctrl.Result{RequeueAfter: time.Minute * 10}, nil
+}
+
+func (r *SchedulationReconciler) runSchedulation(ctx context.Context, log logr.Logger, schedulation *crdv1alpha1.Schedulation) (ctrl.Result, error) {
+
+	// TODO eseguire, tornare errore in caso di errore, altrimenti, alla fine
+
+	// Set the last execution time
+	now := metav1.Now()
+	schedulation.Status.LastExecutionTime = &now
+
+	schedulation.Status.SetExecutedCondition(metav1.ConditionTrue, "Executed", "The schedulation is executed")
+
+	// Update the schedulation status
+	if err := r.Status().Update(ctx, schedulation); err != nil {
+		log.Error(err, "unable to update Schedulation status")
+
+		return ctrl.Result{}, err
+	}
+
+	// Record event SchedulationExecuted
+	r.Recorder.Event(schedulation, "Normal", "SchedulationExecuted", "Schedulation executed")
+
+	if schedulation.Spec.OneShot {
+		// The schedulation is one shot
+
+		// Requeue the schedulation to be deleted
+		return ctrl.Result{RequeueAfter: OneShotExecutedSchedulationDeleteTime}, nil
+	} else {
+		// Requeue after 10 minutes
+		return ctrl.Result{RequeueAfter: time.Minute * 10}, nil
+	}
+}
+
+func (r *SchedulationReconciler) reconcileNotExecutionTime(ctx context.Context, log logr.Logger, schedulation *crdv1alpha1.Schedulation) (ctrl.Result, error) {
+	// Get started condition
+	startedCondition := schedulation.Status.GetStartedCondition()
+
+	if startedCondition.Status != metav1.ConditionFalse {
+		// Update the started condition
+		schedulation.Status.SetStartedCondition(metav1.ConditionFalse, "NotStarted", "The schedulation is not started")
+
+		if err := r.Status().Update(ctx, schedulation); err != nil {
+			log.Error(err, "unable to update Schedulation status")
+
+			return ctrl.Result{}, err
+		}
+	}
+
+	if schedulation.Spec.OneShot {
+		// The schedulation is one shot
+
+		// Requeue the schedulation to be deleted
+		return ctrl.Result{RequeueAfter: OneShotExecutedSchedulationDeleteTime}, nil
+	}
+
+	// Requeue after 10 minutes
+	return ctrl.Result{RequeueAfter: time.Minute * 10}, nil
+}
+
+// checkSchedulationDesiredState checks if the desired state of the schedulation is reached
+func checkSchedulationDesiredState(schedulation *crdv1alpha1.Schedulation) (bool, error) {
 	//TODO: controllare se lo stato desiderato è stato raggiunto
 
 	return true, nil
 }
 
-// UpdateSchedulationStatus updates the status of the schedulation
-func (r *SchedulationReconciler) UpdateSchedulationStatus(ctx context.Context, log logr.Logger, schedulation *crdv1alpha1.Schedulation) {
+// updateSchedulationStatus updates the status of the schedulation
+func (r *SchedulationReconciler) updateSchedulationStatus(ctx context.Context, log logr.Logger, schedulation *crdv1alpha1.Schedulation) {
 	if err := r.Status().Update(ctx, schedulation); err != nil {
 		log.Error(err, "unable to update Schedulation status")
 	}

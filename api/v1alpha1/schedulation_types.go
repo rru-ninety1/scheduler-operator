@@ -74,17 +74,115 @@ const (
 
 // SchedulationStatus defines the observed state of Schedulation
 type SchedulationStatus struct {
+	//TODO: rimuovere
 	// Status of the schedulation. Can be `Running`, `Executed`, `Error`, `Waiting`
 	SchedulationExecutionStatus SchedulationExecutionStatus `json:"executionStatus,omitempty"`
-
-	// Error message, in case of error
-	Error string `json:"error,omitempty"`
 
 	// Last execution time
 	// +optional
 	LastExecutionTime *metav1.Time `json:"lastExecutionTime,omitempty"`
+
+	// Schedulation conditions
+	Conditions []metav1.Condition `json:"conditions"`
 }
 
+const (
+	// ConditionTypeStarted is set when the schedulation is started
+	CondititionTypeStarted = "Started"
+
+	// ConditionTypeExecuted is set when the schedulation is executed
+	ConditionTypeExecuted = "Executed"
+
+	// ConditionTypeError is set when the schedulation has an error
+	ConditionTypeError = "Error"
+)
+
+// SetDefaultConditionsIfNotSet sets the default conditions if not set
+func (schedulationStatus *SchedulationStatus) SetDefaultConditionsIfNotSet() {
+	if schedulationStatus.Conditions == nil {
+		schedulationStatus.Conditions = []metav1.Condition{}
+	}
+
+	schedulationStatus.SetStartedCondition(metav1.ConditionFalse, "NotStarted", "The schedulation is not started")
+	schedulationStatus.SetExecutedCondition(metav1.ConditionFalse, "NotExecuted", "The schedulation is not executed")
+	schedulationStatus.SetErrorCondition(metav1.ConditionFalse, "NoError", "The schedulation has no error")
+}
+
+// SetStartedCondition sets the started condition
+func (schedulationStatus *SchedulationStatus) SetStartedCondition(status metav1.ConditionStatus, reason, message string) {
+	condition := metav1.Condition{
+		Type:    CondititionTypeStarted,
+		Status:  status,
+		Reason:  reason,
+		Message: message,
+	}
+
+	setOrAddCondition(schedulationStatus, condition)
+}
+
+// GetStartedCondition gets the started condition
+func (schedulationStatus *SchedulationStatus) GetStartedCondition() *metav1.Condition {
+	return schedulationStatus.getCondtionByType(CondititionTypeStarted)
+}
+
+// SetExecutedCondition sets the executed condition
+func (schedulationStatus *SchedulationStatus) SetExecutedCondition(status metav1.ConditionStatus, reason, message string) {
+	condition := metav1.Condition{
+		Type:    ConditionTypeExecuted,
+		Status:  status,
+		Reason:  reason,
+		Message: message,
+	}
+
+	setOrAddCondition(schedulationStatus, condition)
+}
+
+// GetExecutedCondition gets the executed condition
+func (schedulationStatus *SchedulationStatus) GetExecutedCondition() *metav1.Condition {
+	return schedulationStatus.getCondtionByType(ConditionTypeExecuted)
+}
+
+// SetErrorCondition sets the error condition
+func (schedulationStatus *SchedulationStatus) SetErrorCondition(status metav1.ConditionStatus, reason, message string) {
+	condition := metav1.Condition{
+		Type:    ConditionTypeError,
+		Status:  status,
+		Reason:  reason,
+		Message: message,
+	}
+
+	setOrAddCondition(schedulationStatus, condition)
+}
+
+// GetErrorCondition gets the error condition
+func (schedulationStatus *SchedulationStatus) GetErrorCondition() *metav1.Condition {
+	return schedulationStatus.getCondtionByType(ConditionTypeError)
+}
+
+// getCondtionByType gets a condition by type
+func (schedulationStatus *SchedulationStatus) getCondtionByType(conditionType string) *metav1.Condition {
+	for _, c := range schedulationStatus.Conditions {
+		if c.Type == conditionType {
+			return &c
+		}
+	}
+
+	return nil
+}
+
+// setOrAddCondition sets or adds a condition to the SchedulationStatus
+func setOrAddCondition(schedulationStatus *SchedulationStatus, condition metav1.Condition) {
+	for i, c := range schedulationStatus.Conditions {
+		if c.Type == condition.Type {
+			schedulationStatus.Conditions[i] = condition
+			return
+		}
+	}
+
+	schedulationStatus.Conditions = append(schedulationStatus.Conditions, condition)
+}
+
+// TODO: rimuovere la parte sotto
 // SchedulationExecutionStatus defines the possible status of a schedulation
 // +kubebuilder:validation:Enum=Running;Executed;Error;Waiting
 // +kubebuilder:default=Waiting
