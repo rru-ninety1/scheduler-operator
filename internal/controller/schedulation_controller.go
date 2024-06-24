@@ -18,8 +18,10 @@ package controller
 
 import (
 	"context"
+	"sort"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -104,6 +106,7 @@ func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	return ctrl.Result{RequeueAfter: time.Minute * 10}, nil
 }
 
+// reconcileExecutionTime reconciles the Schedulation during execution time
 func (r *SchedulationReconciler) reconcileExecutionTime(ctx context.Context, log logr.Logger, schedulation *crdv1alpha1.Schedulation) (ctrl.Result, error) {
 
 	if schedulation.Status.GetStartedCondition().Status != metav1.ConditionTrue {
@@ -137,9 +140,42 @@ func (r *SchedulationReconciler) reconcileExecutionTime(ctx context.Context, log
 	return ctrl.Result{RequeueAfter: time.Minute * 10}, nil
 }
 
+// runSchedulation runs the Schedulation
 func (r *SchedulationReconciler) runSchedulation(ctx context.Context, log logr.Logger, schedulation *crdv1alpha1.Schedulation) (ctrl.Result, error) {
 
-	// TODO eseguire, tornare errore in caso di errore, altrimenti, alla fine
+	// Sort the resources by order
+	sort.Slice(schedulation.Spec.Resources, func(i, j int) bool {
+		return schedulation.Spec.Resources[i].Order < schedulation.Spec.Resources[j].Order
+	})
+
+	for _, resource := range schedulation.Spec.Resources {
+		if resource.Type == crdv1alpha1.ResourceTypeDeployment {
+			if err := r.reconcileDeploymentSchedulation(ctx, log, &resource); err != nil {
+				// Set error condition
+				schedulation.Status.SetErrorCondition(metav1.ConditionTrue, "Error", err.Error())
+
+				// Update the schedulation status
+				if err := r.Status().Update(ctx, schedulation); err != nil {
+					log.Error(err, "unable to update Schedulation status")
+				}
+
+				return ctrl.Result{}, err
+			}
+
+		} else if resource.Type == crdv1alpha1.ResourceTypeStatefulSet {
+			if err := r.reconcileStatefulSetSchedulation(ctx, log, &resource); err != nil {
+				// Set error condition
+				schedulation.Status.SetErrorCondition(metav1.ConditionTrue, "Error", err.Error())
+
+				// Update the schedulation status
+				if err := r.Status().Update(ctx, schedulation); err != nil {
+					log.Error(err, "unable to update Schedulation status")
+				}
+
+				return ctrl.Result{}, err
+			}
+		}
+	}
 
 	// Set the last execution time
 	now := metav1.Now()
@@ -159,7 +195,6 @@ func (r *SchedulationReconciler) runSchedulation(ctx context.Context, log logr.L
 
 	if schedulation.Spec.OneShot {
 		// The schedulation is one shot
-
 		// Requeue the schedulation to be deleted
 		return ctrl.Result{RequeueAfter: OneShotExecutedSchedulationDeleteTime}, nil
 	} else {
@@ -168,6 +203,55 @@ func (r *SchedulationReconciler) runSchedulation(ctx context.Context, log logr.L
 	}
 }
 
+// reconcileDeploymentSchedulation reconciles the Schedulation for Deployment
+func (r *SchedulationReconciler) reconcileDeploymentSchedulation(ctx context.Context, log logr.Logger, resource *crdv1alpha1.ScheduledResource) error {
+	// Get the deployment
+	deployment := &appsv1.Deployment{}
+	if err := r.Get(ctx, client.ObjectKey{Namespace: resource.Namespace, Name: resource.Name}, deployment); err != nil {
+		log.Error(err, "unable to fetch Deployment")
+
+		return client.IgnoreNotFound(err)
+	}
+
+	if deployment.Spec.Replicas != nil && *deployment.Spec.Replicas != resource.ReplicaCount {
+		// Update the deployment
+		deployment.Spec.Replicas = &resource.ReplicaCount
+
+		if err := r.Update(ctx, deployment); err != nil {
+			log.Error(err, "unable to update Deployment")
+
+			return err
+		}
+	}
+
+	return nil
+}
+
+// reconcileStatefulSetSchedulation reconciles the Schedulation for StatefulSet
+func (r *SchedulationReconciler) reconcileStatefulSetSchedulation(ctx context.Context, log logr.Logger, resource *crdv1alpha1.ScheduledResource) error {
+	// Get the statefulset
+	statefulset := &appsv1.StatefulSet{}
+	if err := r.Get(ctx, client.ObjectKey{Namespace: resource.Namespace, Name: resource.Name}, statefulset); err != nil {
+		log.Error(err, "unable to fetch StatefulSet")
+
+		return client.IgnoreNotFound(err)
+	}
+
+	if statefulset.Spec.Replicas != nil && *statefulset.Spec.Replicas != resource.ReplicaCount {
+		// Update the statefulset
+		statefulset.Spec.Replicas = &resource.ReplicaCount
+
+		if err := r.Update(ctx, statefulset); err != nil {
+			log.Error(err, "unable to update StatefulSet")
+
+			return err
+		}
+	}
+
+	return nil
+}
+
+// reconcileNotExecutionTime reconciles the Schedulation during not execution time
 func (r *SchedulationReconciler) reconcileNotExecutionTime(ctx context.Context, log logr.Logger, schedulation *crdv1alpha1.Schedulation) (ctrl.Result, error) {
 	// Get started condition
 	startedCondition := schedulation.Status.GetStartedCondition()
@@ -192,20 +276,6 @@ func (r *SchedulationReconciler) reconcileNotExecutionTime(ctx context.Context, 
 
 	// Requeue after 10 minutes
 	return ctrl.Result{RequeueAfter: time.Minute * 10}, nil
-}
-
-// checkSchedulationDesiredState checks if the desired state of the schedulation is reached
-func checkSchedulationDesiredState(schedulation *crdv1alpha1.Schedulation) (bool, error) {
-	//TODO: controllare se lo stato desiderato è stato raggiunto
-
-	return true, nil
-}
-
-// updateSchedulationStatus updates the status of the schedulation
-func (r *SchedulationReconciler) updateSchedulationStatus(ctx context.Context, log logr.Logger, schedulation *crdv1alpha1.Schedulation) {
-	if err := r.Status().Update(ctx, schedulation); err != nil {
-		log.Error(err, "unable to update Schedulation status")
-	}
 }
 
 // SetupWithManager sets up the controller with the Manager.
