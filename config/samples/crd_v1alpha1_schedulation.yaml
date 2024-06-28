@@ -4,20 +4,13 @@ metadata:
   name: example-schedulation
   namespace: default
 spec:
-  endHour: 18
-  oneShot: false
-  resources:
-    - name: example-resource
-      namespace: default
-      replicaCount: 3
-      type: Deployment
-    - name: example-statefulset
-      namespace: default
-      replicaCount: 2
-      type: StatefulSet      
-  startHour: 9
   suspended: false
-status:
-  error: ""
-  executionStatus: Waiting
-  lastExecutionTime: "2022-01-01T00:00:00Z"
+  oneShot: false
+  startHour: 9
+  endHour: 19
+  resources:
+    - name: nginx-deployment
+      namespace: default
+      type: Deployment    
+      replicaCount: 3
+      order: 1

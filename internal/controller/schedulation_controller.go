@@ -44,10 +44,12 @@ const (
 	OneShotExecutedSchedulationDeleteTime = time.Minute * 2
 )
 
-//+kubebuilder:rbac:groups=crd.rru.io,resources=schedulations,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=crd.rru.io,resources=schedulations/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=crd.rru.io,resources=schedulations/finalizers,verbs=update
-//+kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
+// +kubebuilder:rbac:groups=crd.rru.io,resources=schedulations,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=crd.rru.io,resources=schedulations/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=crd.rru.io,resources=schedulations/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=apps,resources=statefulset,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 
 func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Get the logger
@@ -129,10 +131,9 @@ func (r *SchedulationReconciler) reconcileExecutionTime(ctx context.Context, log
 		return r.runSchedulation(ctx, log, schedulation)
 
 	} else if schedulation.Status.GetExecutedCondition().Status != metav1.ConditionTrue {
-		// The schedulation is started but not executed
+		// The schedulation is started but not executed to the end
 
-		//TODO vedere a che punto è la schedulazione
-		//proseguire con l'esecuzione
+		// Run the schedulation
 		return r.runSchedulation(ctx, log, schedulation)
 	}
 

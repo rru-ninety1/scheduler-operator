@@ -68,6 +68,10 @@ make undeploy
 
 ### Test with KIND
 
+Generate manifest
+```sh
+make manifests
+
 Create cluster
 ```sh
 kind create cluster
@@ -76,6 +80,11 @@ kind create cluster
 Install CRD
 ```sh
 make install
+```
+
+Instal nginx example deployment
+```sh
+kubectl apply -f config/samples/nginx_deployment.yaml
 ```
 
 Run operator locally

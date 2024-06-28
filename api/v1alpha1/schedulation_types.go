@@ -103,9 +103,20 @@ func (schedulationStatus *SchedulationStatus) SetDefaultConditionsIfNotSet() {
 		schedulationStatus.Conditions = []metav1.Condition{}
 	}
 
-	schedulationStatus.SetStartedCondition(metav1.ConditionFalse, "NotStarted", "The schedulation is not started")
-	schedulationStatus.SetExecutedCondition(metav1.ConditionFalse, "NotExecuted", "The schedulation is not executed")
-	schedulationStatus.SetErrorCondition(metav1.ConditionFalse, "NoError", "The schedulation has no error")
+	// Check fi startd condition is set, if not set it
+	if schedulationStatus.GetStartedCondition() == nil {
+		schedulationStatus.SetStartedCondition(metav1.ConditionFalse, "NotStarted", "The schedulation is not started")
+	}
+
+	// Check if executed condition is set, if not set it
+	if schedulationStatus.GetExecutedCondition() == nil {
+		schedulationStatus.SetExecutedCondition(metav1.ConditionFalse, "NotExecuted", "The schedulation is not executed")
+	}
+
+	// Check if error condition is set, if not set it
+	if schedulationStatus.GetErrorCondition() == nil {
+		schedulationStatus.SetErrorCondition(metav1.ConditionFalse, "NoError", "The schedulation has no error")
+	}
 }
 
 // SetStartedCondition sets the started condition
@@ -172,6 +183,8 @@ func (schedulationStatus *SchedulationStatus) getCondtionByType(conditionType st
 
 // setOrAddCondition sets or adds a condition to the SchedulationStatus
 func setOrAddCondition(schedulationStatus *SchedulationStatus, condition metav1.Condition) {
+	condition.LastTransitionTime = metav1.Now()
+
 	for i, c := range schedulationStatus.Conditions {
 		if c.Type == condition.Type {
 			schedulationStatus.Conditions[i] = condition
