@@ -20,6 +20,28 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// ResourceType defines the type of the resource to control
+// +kubebuilder:validation:Enum=Deployment;StatefulSet
+// +kubebuilder:default=Deployment
+type ResourceType string
+
+const (
+	ResourceTypeDeployment ResourceType = "Deployment"
+
+	ResourceTypeStatefulSet ResourceType = "StatefulSet"
+)
+
+const (
+	// ConditionTypeStarted is set when the schedulation is started
+	CondititionTypeStarted = "Started"
+
+	// ConditionTypeExecuted is set when the schedulation is executed
+	ConditionTypeExecuted = "Executed"
+
+	// ConditionTypeError is set when the schedulation has an error
+	ConditionTypeError = "Error"
+)
+
 // SchedulationSpec defines the desired state of Schedulation
 type SchedulationSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
@@ -44,6 +66,7 @@ type SchedulationSpec struct {
 	Resources []ScheduledResource `json:"resources,omitempty"`
 }
 
+// ScheduledResource defines a resource to control
 type ScheduledResource struct {
 	// Type of the resource to control. Can be `Deployment` or `StatefulSet`
 	Type ResourceType `json:"type,omitempty"`
@@ -61,23 +84,8 @@ type ScheduledResource struct {
 	Order int32 `json:"order,omitempty"`
 }
 
-// ResourceType defines the type of the resource to control
-// +kubebuilder:validation:Enum=Deployment;StatefulSet
-// +kubebuilder:default=Deployment
-type ResourceType string
-
-const (
-	ResourceTypeDeployment ResourceType = "Deployment"
-
-	ResourceTypeStatefulSet ResourceType = "StatefulSet"
-)
-
 // SchedulationStatus defines the observed state of Schedulation
 type SchedulationStatus struct {
-	//TODO: rimuovere
-	// Status of the schedulation. Can be `Running`, `Executed`, `Error`, `Waiting`
-	SchedulationExecutionStatus SchedulationExecutionStatus `json:"executionStatus,omitempty"`
-
 	// Last execution time
 	// +optional
 	LastExecutionTime *metav1.Time `json:"lastExecutionTime,omitempty"`
@@ -86,16 +94,26 @@ type SchedulationStatus struct {
 	Conditions []metav1.Condition `json:"conditions"`
 }
 
-const (
-	// ConditionTypeStarted is set when the schedulation is started
-	CondititionTypeStarted = "Started"
+//+kubebuilder:object:root=true
+//+kubebuilder:subresource:status
 
-	// ConditionTypeExecuted is set when the schedulation is executed
-	ConditionTypeExecuted = "Executed"
+// Schedulation is the Schema for the schedulations API
+type Schedulation struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// ConditionTypeError is set when the schedulation has an error
-	ConditionTypeError = "Error"
-)
+	Spec   SchedulationSpec   `json:"spec,omitempty"`
+	Status SchedulationStatus `json:"status,omitempty"`
+}
+
+//+kubebuilder:object:root=true
+
+// SchedulationList contains a list of Schedulation
+type SchedulationList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []Schedulation `json:"items"`
+}
 
 // SetDefaultConditionsIfNotSet sets the default conditions if not set
 func (schedulationStatus *SchedulationStatus) SetDefaultConditionsIfNotSet() {
@@ -193,47 +211,6 @@ func setOrAddCondition(schedulationStatus *SchedulationStatus, condition metav1.
 	}
 
 	schedulationStatus.Conditions = append(schedulationStatus.Conditions, condition)
-}
-
-// TODO: rimuovere la parte sotto
-// SchedulationExecutionStatus defines the possible status of a schedulation
-// +kubebuilder:validation:Enum=Running;Executed;Error;Waiting
-// +kubebuilder:default=Waiting
-type SchedulationExecutionStatus string
-
-const (
-	// The schedulation is running
-	SchedulationExecutionStatusRunning SchedulationExecutionStatus = "Running"
-
-	// The schedulation has been executed
-	SchedulationExecutionStatusExecuted SchedulationExecutionStatus = "Executed"
-
-	// The schedulation has an error
-	SchedulationExecutionStatusError SchedulationExecutionStatus = "Error"
-
-	// The schedulation is waiting to be executed
-	SchedulationExecutionStatusWaiting SchedulationExecutionStatus = "Waiting"
-)
-
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-
-// Schedulation is the Schema for the schedulations API
-type Schedulation struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   SchedulationSpec   `json:"spec,omitempty"`
-	Status SchedulationStatus `json:"status,omitempty"`
-}
-
-//+kubebuilder:object:root=true
-
-// SchedulationList contains a list of Schedulation
-type SchedulationList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Schedulation `json:"items"`
 }
 
 func init() {

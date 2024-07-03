@@ -58,7 +58,7 @@ func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Get the schedulation object
 	schedulation := &crdv1alpha1.Schedulation{}
 	if err := r.Get(ctx, req.NamespacedName, schedulation); err != nil {
-		log.Error(err, "unable to fetch Schedulation")
+		log.Error(err, "Unable to fetch Schedulation", "schedulation", req.NamespacedName)
 
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -74,11 +74,12 @@ func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		if executedCondition.Status == metav1.ConditionTrue {
 			// The schedulation is executed
 			lastExecution := schedulation.Status.LastExecutionTime.Time
+
 			if time.Now().After(lastExecution.Add(OneShotExecutedSchedulationDeleteTime)) {
 				// It's time to delete the schedulation
 				// Delete the schedulation
 				if err := r.Delete(ctx, schedulation); err != nil {
-					log.Error(err, "unable to delete Schedulation")
+					log.Error(err, "Unable to delete Schedulation", "schedulation", req.NamespacedName)
 
 					return ctrl.Result{}, err
 				}
@@ -119,7 +120,7 @@ func (r *SchedulationReconciler) reconcileExecutionTime(ctx context.Context, log
 		schedulation.Status.SetErrorCondition(metav1.ConditionFalse, "NoError", "The schedulation has no error")
 
 		if err := r.Status().Update(ctx, schedulation); err != nil {
-			log.Error(err, "unable to update Schedulation status")
+			log.Error(err, "Unable to update Schedulation status", "schedulation", schedulation.Name)
 
 			return ctrl.Result{}, err
 		}
@@ -151,26 +152,28 @@ func (r *SchedulationReconciler) runSchedulation(ctx context.Context, log logr.L
 
 	for _, resource := range schedulation.Spec.Resources {
 		if resource.Type == crdv1alpha1.ResourceTypeDeployment {
+			// Reconcile the Schedulation for Deployment
 			if err := r.reconcileDeploymentSchedulation(ctx, log, &resource); err != nil {
 				// Set error condition
 				schedulation.Status.SetErrorCondition(metav1.ConditionTrue, "Error", err.Error())
 
 				// Update the schedulation status
 				if err := r.Status().Update(ctx, schedulation); err != nil {
-					log.Error(err, "unable to update Schedulation status")
+					log.Error(err, "Unable to update Schedulation status", "schedulation", schedulation.Name)
 				}
 
 				return ctrl.Result{}, err
 			}
 
 		} else if resource.Type == crdv1alpha1.ResourceTypeStatefulSet {
+			// Reconcile the Schedulation for StatefulSet
 			if err := r.reconcileStatefulSetSchedulation(ctx, log, &resource); err != nil {
 				// Set error condition
 				schedulation.Status.SetErrorCondition(metav1.ConditionTrue, "Error", err.Error())
 
 				// Update the schedulation status
 				if err := r.Status().Update(ctx, schedulation); err != nil {
-					log.Error(err, "unable to update Schedulation status")
+					log.Error(err, "Unable to update Schedulation status", "schedulation", schedulation.Name)
 				}
 
 				return ctrl.Result{}, err
@@ -178,15 +181,14 @@ func (r *SchedulationReconciler) runSchedulation(ctx context.Context, log logr.L
 		}
 	}
 
-	// Set the last execution time
+	// Set the last execution time and executed condition
 	now := metav1.Now()
 	schedulation.Status.LastExecutionTime = &now
-
 	schedulation.Status.SetExecutedCondition(metav1.ConditionTrue, "Executed", "The schedulation is executed")
 
 	// Update the schedulation status
 	if err := r.Status().Update(ctx, schedulation); err != nil {
-		log.Error(err, "unable to update Schedulation status")
+		log.Error(err, "Unable to update Schedulation status", "schedulation", schedulation.Name)
 
 		return ctrl.Result{}, err
 	}
@@ -208,8 +210,10 @@ func (r *SchedulationReconciler) runSchedulation(ctx context.Context, log logr.L
 func (r *SchedulationReconciler) reconcileDeploymentSchedulation(ctx context.Context, log logr.Logger, resource *crdv1alpha1.ScheduledResource) error {
 	// Get the deployment
 	deployment := &appsv1.Deployment{}
-	if err := r.Get(ctx, client.ObjectKey{Namespace: resource.Namespace, Name: resource.Name}, deployment); err != nil {
-		log.Error(err, "unable to fetch Deployment")
+	objectKey := client.ObjectKey{Namespace: resource.Namespace, Name: resource.Name}
+
+	if err := r.Get(ctx, objectKey, deployment); err != nil {
+		log.Error(err, "Unable to fetch Deployment", "deployment", objectKey)
 
 		return client.IgnoreNotFound(err)
 	}
@@ -219,7 +223,7 @@ func (r *SchedulationReconciler) reconcileDeploymentSchedulation(ctx context.Con
 		deployment.Spec.Replicas = &resource.ReplicaCount
 
 		if err := r.Update(ctx, deployment); err != nil {
-			log.Error(err, "unable to update Deployment")
+			log.Error(err, "Unable to update Deployment", "deployment", objectKey)
 
 			return err
 		}
@@ -232,8 +236,10 @@ func (r *SchedulationReconciler) reconcileDeploymentSchedulation(ctx context.Con
 func (r *SchedulationReconciler) reconcileStatefulSetSchedulation(ctx context.Context, log logr.Logger, resource *crdv1alpha1.ScheduledResource) error {
 	// Get the statefulset
 	statefulset := &appsv1.StatefulSet{}
-	if err := r.Get(ctx, client.ObjectKey{Namespace: resource.Namespace, Name: resource.Name}, statefulset); err != nil {
-		log.Error(err, "unable to fetch StatefulSet")
+	objectKey := client.ObjectKey{Namespace: resource.Namespace, Name: resource.Name}
+
+	if err := r.Get(ctx, objectKey, statefulset); err != nil {
+		log.Error(err, "Unable to fetch StatefulSet", "statefulset", objectKey)
 
 		return client.IgnoreNotFound(err)
 	}
@@ -243,7 +249,7 @@ func (r *SchedulationReconciler) reconcileStatefulSetSchedulation(ctx context.Co
 		statefulset.Spec.Replicas = &resource.ReplicaCount
 
 		if err := r.Update(ctx, statefulset); err != nil {
-			log.Error(err, "unable to update StatefulSet")
+			log.Error(err, "Unable to update StatefulSet", "statefulset", objectKey)
 
 			return err
 		}
@@ -262,7 +268,7 @@ func (r *SchedulationReconciler) reconcileNotExecutionTime(ctx context.Context, 
 		schedulation.Status.SetStartedCondition(metav1.ConditionFalse, "NotStarted", "The schedulation is not started")
 
 		if err := r.Status().Update(ctx, schedulation); err != nil {
-			log.Error(err, "unable to update Schedulation status")
+			log.Error(err, "Unable to update Schedulation status", "schedulation", schedulation.Name)
 
 			return ctrl.Result{}, err
 		}

@@ -51,6 +51,7 @@ spec:
               resources:
                 description: Resources to control
                 items:
+                  description: ScheduledResource defines a resource to control
                   properties:
                     name:
                       description: Name of the resource
@@ -159,16 +160,6 @@ spec:
                   - type
                   type: object
                 type: array
-              executionStatus:
-                description: |-
-                  TODO: rimuovere
-                  Status of the schedulation. Can be `Running`, `Executed`, `Error`, `Waiting`
-                enum:
-                - Running
-                - Executed
-                - Error
-                - Waiting
-                type: string
               lastExecutionTime:
                 description: Last execution time
                 format: date-time
