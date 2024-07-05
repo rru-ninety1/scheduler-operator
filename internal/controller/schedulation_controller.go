@@ -115,9 +115,9 @@ func (r *SchedulationReconciler) reconcileExecutionTime(ctx context.Context, log
 	if schedulation.Status.GetStartedCondition().Status != metav1.ConditionTrue {
 		// The schedulation is not started
 		// Update the conditions
-		schedulation.Status.SetStartedCondition(metav1.ConditionTrue, "Started", "The schedulation is started")
-		schedulation.Status.SetExecutedCondition(metav1.ConditionFalse, "NotExecuted", "The schedulation is not executed")
-		schedulation.Status.SetErrorCondition(metav1.ConditionFalse, "NoError", "The schedulation has no error")
+		schedulation.Status.SetStartedCondition(metav1.ConditionTrue, crdv1alpha1.StartedConditionStartedReason, crdv1alpha1.StartedConditionStartedMessage)
+		schedulation.Status.SetExecutedCondition(metav1.ConditionFalse, crdv1alpha1.ExecutedConditionNotExecutedReason, crdv1alpha1.ExecutedConditionNotExecutedMessage)
+		schedulation.Status.SetErrorCondition(metav1.ConditionFalse, crdv1alpha1.ErrorConditionNoErrorReason, crdv1alpha1.ErrorConditionNoErrorMessage)
 
 		if err := r.Status().Update(ctx, schedulation); err != nil {
 			log.Error(err, "Unable to update Schedulation status", "schedulation", schedulation.Name)
@@ -155,7 +155,7 @@ func (r *SchedulationReconciler) runSchedulation(ctx context.Context, log logr.L
 			// Reconcile the Schedulation for Deployment
 			if err := r.reconcileDeploymentSchedulation(ctx, log, &resource); err != nil {
 				// Set error condition
-				schedulation.Status.SetErrorCondition(metav1.ConditionTrue, "Error", err.Error())
+				schedulation.Status.SetErrorCondition(metav1.ConditionTrue, crdv1alpha1.ErrorConditionErrorReason, err.Error())
 
 				// Update the schedulation status
 				if err := r.Status().Update(ctx, schedulation); err != nil {
@@ -184,7 +184,7 @@ func (r *SchedulationReconciler) runSchedulation(ctx context.Context, log logr.L
 	// Set the last execution time and executed condition
 	now := metav1.Now()
 	schedulation.Status.LastExecutionTime = &now
-	schedulation.Status.SetExecutedCondition(metav1.ConditionTrue, "Executed", "The schedulation is executed")
+	schedulation.Status.SetExecutedCondition(metav1.ConditionTrue, crdv1alpha1.ExecutedConditionExecutedReason, crdv1alpha1.ExecutedConditionExecutedMessage)
 
 	// Update the schedulation status
 	if err := r.Status().Update(ctx, schedulation); err != nil {
@@ -265,7 +265,7 @@ func (r *SchedulationReconciler) reconcileNotExecutionTime(ctx context.Context, 
 
 	if startedCondition.Status != metav1.ConditionFalse {
 		// Update the started condition
-		schedulation.Status.SetStartedCondition(metav1.ConditionFalse, "NotStarted", "The schedulation is not started")
+		schedulation.Status.SetStartedCondition(metav1.ConditionFalse, crdv1alpha1.StartedConditionNotStartedReason, crdv1alpha1.StartedConditionNotStartedMessage)
 
 		if err := r.Status().Update(ctx, schedulation); err != nil {
 			log.Error(err, "Unable to update Schedulation status", "schedulation", schedulation.Name)

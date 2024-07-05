@@ -42,6 +42,45 @@ const (
 	ConditionTypeError = "Error"
 )
 
+const (
+	// StartedConditionNotStartedReason is the reason for the NotStarted condition
+	StartedConditionNotStartedReason = "NotStarted"
+
+	// StartedConditionNotStartedMessage is the message for the NotStarted condition
+	StartedConditionNotStartedMessage = "The schedulation is not started"
+
+	// StartedConditionStartedReadon is the reason for the Started condition
+	StartedConditionStartedReason = "Started"
+
+	// StartedConditionStartedMessage is the message for the Started condition
+	StartedConditionStartedMessage = "The schedulation is started"
+)
+
+const (
+	// ExecutedConditionNotExecutedReason is the reason for the NotExecuted condition
+	ExecutedConditionNotExecutedReason = "NotExecuted"
+
+	// ExecutedConditionNotExecutedMessage is the message for the NotExecuted condition
+	ExecutedConditionNotExecutedMessage = "The schedulation is not executed"
+
+	// ExecutedConditionExecutedReason is the reason for the Executed condition
+	ExecutedConditionExecutedReason = "Executed"
+
+	// ExecutedConditionExecutedMessage is the message for the Executed condition
+	ExecutedConditionExecutedMessage = "The schedulation is executed"
+)
+
+const (
+	// ErrorConditionErrorReason is the reason for the Error condition
+	ErrorConditionErrorReason = "Error"
+
+	// ErrorConditionNoErrorReason is the reason for the NoError condition
+	ErrorConditionNoErrorReason = "NoError"
+
+	// ErrorConditionNoErrorMessage is the message for the NoError condition
+	ErrorConditionNoErrorMessage = "The schedulation has no error"
+)
+
 // SchedulationSpec defines the desired state of Schedulation
 type SchedulationSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
@@ -123,17 +162,17 @@ func (schedulationStatus *SchedulationStatus) SetDefaultConditionsIfNotSet() {
 
 	// Check fi startd condition is set, if not set it
 	if schedulationStatus.GetStartedCondition() == nil {
-		schedulationStatus.SetStartedCondition(metav1.ConditionFalse, "NotStarted", "The schedulation is not started")
+		schedulationStatus.SetStartedCondition(metav1.ConditionFalse, StartedConditionNotStartedReason, StartedConditionNotStartedMessage)
 	}
 
 	// Check if executed condition is set, if not set it
 	if schedulationStatus.GetExecutedCondition() == nil {
-		schedulationStatus.SetExecutedCondition(metav1.ConditionFalse, "NotExecuted", "The schedulation is not executed")
+		schedulationStatus.SetExecutedCondition(metav1.ConditionFalse, ExecutedConditionNotExecutedReason, ExecutedConditionNotExecutedMessage)
 	}
 
 	// Check if error condition is set, if not set it
 	if schedulationStatus.GetErrorCondition() == nil {
-		schedulationStatus.SetErrorCondition(metav1.ConditionFalse, "NoError", "The schedulation has no error")
+		schedulationStatus.SetErrorCondition(metav1.ConditionFalse, ErrorConditionNoErrorReason, ErrorConditionNoErrorMessage)
 	}
 }
 
