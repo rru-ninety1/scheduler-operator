@@ -123,7 +123,7 @@ var _ = Describe("Schedulation Controller", func() {
 
 		BeforeEach(func() {
 			By("Creating the custom resource for the Kind Schedulation")
-			schedulation := &crdv1alpha1.Schedulation{
+			schedulation = &crdv1alpha1.Schedulation{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      resourceName,
 					Namespace: resourceNamespace,
