@@ -83,6 +83,8 @@ func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 					return ctrl.Result{}, err
 				}
+
+				return ctrl.Result{}, nil
 			}
 
 			// Requeue the schedulation to be deleted
