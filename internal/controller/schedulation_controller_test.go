@@ -119,28 +119,22 @@ var _ = Describe("Schedulation Controller", func() {
 			Namespace: resourceNamespace,
 		}
 
-		var schedulation *crdv1alpha1.Schedulation
-
 		BeforeEach(func() {
 			By("Creating the custom resource for the Kind Schedulation")
-			schedulation = &crdv1alpha1.Schedulation{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      resourceName,
-					Namespace: resourceNamespace,
-				},
-				Spec: crdv1alpha1.SchedulationSpec{
-					OneShot:   true,
-					Suspended: false,
-				},
-			}
-
-			resource := &crdv1alpha1.Schedulation{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
+			schedulation := &crdv1alpha1.Schedulation{}
+			err := k8sClient.Get(ctx, typeNamespacedName, schedulation)
 			if err != nil && errors.IsNotFound(err) {
-				// Create the Schedulation
+				schedulation = &crdv1alpha1.Schedulation{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      resourceName,
+						Namespace: "default",
+					},
+					Spec: crdv1alpha1.SchedulationSpec{
+						OneShot:   true,
+						Suspended: false,
+					},
+				}
 				Expect(k8sClient.Create(ctx, schedulation)).To(Succeed())
-			} else {
-				schedulation = resource
 			}
 
 			schedulation.Status.SetDefaultConditionsIfNotSet()
@@ -163,6 +157,9 @@ var _ = Describe("Schedulation Controller", func() {
 		})
 
 		It("should delete the Schedulation, if enough time has passed", func() {
+			schedulation := &crdv1alpha1.Schedulation{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, schedulation)).To(Succeed())
+
 			By("Set last execution time to a time that is older than the delete time")
 			schedulation.Status.LastExecutionTime = &metav1.Time{
 				Time: metav1.Now().Add(-(OneShotExecutedSchedulationDeleteTime + time.Minute)),
@@ -184,13 +181,16 @@ var _ = Describe("Schedulation Controller", func() {
 
 			// Check if the Schedulation has been deleted
 			By("Checking if the Schedulation has been deleted")
-			resource := &crdv1alpha1.Schedulation{}
-			err = k8sClient.Get(ctx, typeNamespacedName, resource)
+			schedulation = &crdv1alpha1.Schedulation{}
+			err = k8sClient.Get(ctx, typeNamespacedName, schedulation)
 			Expect(err).To(HaveOccurred())
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
 
 		It("should not delete the Schedulation, if not enough time has passed", func() {
+			schedulation := &crdv1alpha1.Schedulation{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, schedulation)).To(Succeed())
+
 			By("Set last execution time to a time that is not older than the delete time")
 			schedulation.Status.LastExecutionTime = &metav1.Time{
 				Time: metav1.Now().Time,
@@ -208,12 +208,12 @@ var _ = Describe("Schedulation Controller", func() {
 				NamespacedName: typeNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
-			Expect(result).To(Equal(reconcile.Result{Requeue: true}))
+			Expect(result.RequeueAfter).To(Equal(OneShotExecutedSchedulationDeleteTime))
 
 			// Check if the Schedulation has been deleted
 			By("Checking if the Schedulation has been deleted")
-			resource := &crdv1alpha1.Schedulation{}
-			err = k8sClient.Get(ctx, typeNamespacedName, resource)
+			schedulation = &crdv1alpha1.Schedulation{}
+			err = k8sClient.Get(ctx, typeNamespacedName, schedulation)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
