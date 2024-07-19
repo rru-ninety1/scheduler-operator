@@ -390,4 +390,56 @@ var _ = Describe("Schedulation Controller", func() {
 			Expect(schedulation.Status.GetStartedCondition().Status).To(Equal(metav1.ConditionFalse))
 		})
 	})
+
+	Context("When reconciling a schedulation that is in execution time", func() {
+		const resourceName = "test-resource"
+		const resourceNamespace = "default"
+
+		ctx := context.Background()
+
+		typeNamespacedName := types.NamespacedName{
+			Name:      resourceName,
+			Namespace: resourceNamespace,
+		}
+
+		BeforeEach(func() {
+			By("Creating the custom resource for the Kind Schedulation")
+			schedulation := &crdv1alpha1.Schedulation{}
+			err := k8sClient.Get(ctx, typeNamespacedName, schedulation)
+			if err != nil && errors.IsNotFound(err) {
+				schedulation = &crdv1alpha1.Schedulation{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      resourceName,
+						Namespace: "default",
+					},
+					Spec: crdv1alpha1.SchedulationSpec{
+						Suspended: false,
+						StartHour: 0,
+						EndHour:   24,
+					},
+				}
+				Expect(k8sClient.Create(ctx, schedulation)).To(Succeed())
+			}
+
+			By("Set set default conditions")
+			schedulation.Status.SetDefaultConditionsIfNotSet()
+			Expect(k8sClient.Status().Update(ctx, schedulation)).To(Succeed())
+		})
+
+		AfterEach(func() {
+			resource := &crdv1alpha1.Schedulation{}
+			err := k8sClient.Get(ctx, typeNamespacedName, resource)
+
+			if !errors.IsNotFound(err) {
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Cleanup the specific resource instance Schedulation")
+				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			}
+		})
+
+		//TODO test per già eseguito
+		//TODO test per avviato ma non eseguito
+		//TODO test per da avviare
+	})
 })
