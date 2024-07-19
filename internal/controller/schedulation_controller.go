@@ -42,6 +42,7 @@ type SchedulationReconciler struct {
 
 const (
 	OneShotExecutedSchedulationDeleteTime = time.Minute * 2
+	DefaultRequeueTime                    = time.Minute * 10
 )
 
 // +kubebuilder:rbac:groups=crd.rru.io,resources=schedulations,verbs=get;list;watch;create;update;patch;delete
@@ -92,23 +93,21 @@ func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		}
 	}
 
-	if !schedulation.Spec.Suspended {
-		// The schedulation is not suspended
-
-		// Get current hour
-		currentHour := int32(time.Now().Hour())
-
-		if schedulation.Spec.StartHour <= currentHour && schedulation.Spec.EndHour >= currentHour {
-			// Now is beetwen the start and end time of the schedulation
-			return r.reconcileExecutionTime(ctx, log, schedulation)
-		} else {
-			return r.reconcileNotExecutionTime(ctx, log, schedulation)
-		}
-
+	if schedulation.Spec.Suspended {
+		// The schedulation is suspended
+		return ctrl.Result{}, nil
 	}
 
-	// Requeue after 10 minutes
-	return ctrl.Result{RequeueAfter: time.Minute * 10}, nil
+	// The schedulation is not suspended
+	// Get current hour
+	currentHour := int32(time.Now().Hour())
+
+	if schedulation.Spec.StartHour <= currentHour && schedulation.Spec.EndHour >= currentHour {
+		// Now is beetwen the start and end time of the schedulation
+		return r.reconcileExecutionTime(ctx, log, schedulation)
+	} else {
+		return r.reconcileNotExecutionTime(ctx, log, schedulation)
+	}
 }
 
 // reconcileExecutionTime reconciles the Schedulation during execution time
@@ -141,7 +140,7 @@ func (r *SchedulationReconciler) reconcileExecutionTime(ctx context.Context, log
 	}
 
 	// Requeue after 10 minutes
-	return ctrl.Result{RequeueAfter: time.Minute * 10}, nil
+	return ctrl.Result{RequeueAfter: DefaultRequeueTime}, nil
 }
 
 // runSchedulation runs the Schedulation
@@ -204,7 +203,7 @@ func (r *SchedulationReconciler) runSchedulation(ctx context.Context, log logr.L
 		return ctrl.Result{RequeueAfter: OneShotExecutedSchedulationDeleteTime}, nil
 	} else {
 		// Requeue after 10 minutes
-		return ctrl.Result{RequeueAfter: time.Minute * 10}, nil
+		return ctrl.Result{RequeueAfter: DefaultRequeueTime}, nil
 	}
 }
 
@@ -276,15 +275,8 @@ func (r *SchedulationReconciler) reconcileNotExecutionTime(ctx context.Context, 
 		}
 	}
 
-	if schedulation.Spec.OneShot {
-		// The schedulation is one shot
-
-		// Requeue the schedulation to be deleted
-		return ctrl.Result{RequeueAfter: OneShotExecutedSchedulationDeleteTime}, nil
-	}
-
 	// Requeue after 10 minutes
-	return ctrl.Result{RequeueAfter: time.Minute * 10}, nil
+	return ctrl.Result{RequeueAfter: DefaultRequeueTime}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

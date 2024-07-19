@@ -217,4 +217,177 @@ var _ = Describe("Schedulation Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
+
+	Context("When reconciling a suspended schedulation", func() {
+		const resourceName = "test-resource"
+		const resourceNamespace = "default"
+
+		ctx := context.Background()
+
+		typeNamespacedName := types.NamespacedName{
+			Name:      resourceName,
+			Namespace: resourceNamespace,
+		}
+
+		BeforeEach(func() {
+			By("Creating the custom resource for the Kind Schedulation")
+			schedulation := &crdv1alpha1.Schedulation{}
+			err := k8sClient.Get(ctx, typeNamespacedName, schedulation)
+			if err != nil && errors.IsNotFound(err) {
+				schedulation = &crdv1alpha1.Schedulation{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      resourceName,
+						Namespace: "default",
+					},
+					Spec: crdv1alpha1.SchedulationSpec{
+						Suspended: true,
+					},
+				}
+				Expect(k8sClient.Create(ctx, schedulation)).To(Succeed())
+			}
+
+			By("Set default conditions")
+			schedulation.Status.SetDefaultConditionsIfNotSet()
+			Expect(k8sClient.Status().Update(ctx, schedulation)).To(Succeed())
+		})
+
+		AfterEach(func() {
+			resource := &crdv1alpha1.Schedulation{}
+			err := k8sClient.Get(ctx, typeNamespacedName, resource)
+
+			if !errors.IsNotFound(err) {
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Cleanup the specific resource instance Schedulation")
+				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			}
+		})
+
+		It("should not execute the Schedulation and not requeue it", func() {
+			schedulation := &crdv1alpha1.Schedulation{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, schedulation)).To(Succeed())
+
+			// Reconcile the Schedulation
+			By("Reconciling the created resource")
+			controllerReconciler := &SchedulationReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.Requeue).To(BeFalse())
+			Expect(result.RequeueAfter).To(Equal(time.Duration(0)))
+
+			// Check if the Schedulation has not been executed or started
+			By("Checking if the Schedulation has not been executed or started")
+			schedulation = &crdv1alpha1.Schedulation{}
+			err = k8sClient.Get(ctx, typeNamespacedName, schedulation)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(schedulation.Status.GetExecutedCondition().Status).To(Equal(metav1.ConditionFalse))
+			Expect(schedulation.Status.GetStartedCondition().Status).To(Equal(metav1.ConditionFalse))
+		})
+	})
+
+	Context("When reconciling a schedulation that is not in execution time", func() {
+		const resourceName = "test-resource"
+		const resourceNamespace = "default"
+
+		ctx := context.Background()
+
+		typeNamespacedName := types.NamespacedName{
+			Name:      resourceName,
+			Namespace: resourceNamespace,
+		}
+
+		BeforeEach(func() {
+			By("Creating the custom resource for the Kind Schedulation")
+			schedulation := &crdv1alpha1.Schedulation{}
+			err := k8sClient.Get(ctx, typeNamespacedName, schedulation)
+			if err != nil && errors.IsNotFound(err) {
+				schedulation = &crdv1alpha1.Schedulation{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      resourceName,
+						Namespace: "default",
+					},
+					Spec: crdv1alpha1.SchedulationSpec{
+						Suspended: false,
+						StartHour: int32(time.Now().Hour()) - 2,
+						EndHour:   int32(time.Now().Hour()) - 1,
+					},
+				}
+				Expect(k8sClient.Create(ctx, schedulation)).To(Succeed())
+			}
+
+			By("Set set default conditions")
+			schedulation.Status.SetDefaultConditionsIfNotSet()
+			Expect(k8sClient.Status().Update(ctx, schedulation)).To(Succeed())
+		})
+
+		AfterEach(func() {
+			resource := &crdv1alpha1.Schedulation{}
+			err := k8sClient.Get(ctx, typeNamespacedName, resource)
+
+			if !errors.IsNotFound(err) {
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Cleanup the specific resource instance Schedulation")
+				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			}
+		})
+
+		It("should not execute the Schedulation and requeue it", func() {
+			schedulation := &crdv1alpha1.Schedulation{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, schedulation)).To(Succeed())
+
+			// Reconcile the Schedulation
+			By("Reconciling the created resource")
+			controllerReconciler := &SchedulationReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.RequeueAfter).To(Equal(DefaultRequeueTime))
+
+			// Check if the Schedulation has not been started
+			By("Checking if the Schedulation has not been started")
+			schedulation = &crdv1alpha1.Schedulation{}
+			err = k8sClient.Get(ctx, typeNamespacedName, schedulation)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(schedulation.Status.GetStartedCondition().Status).To(Equal(metav1.ConditionFalse))
+		})
+
+		It("should set the started condition to false, if it's true", func() {
+			schedulation := &crdv1alpha1.Schedulation{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, schedulation)).To(Succeed())
+
+			By("Set started condition to true")
+			schedulation.Status.SetStartedCondition(metav1.ConditionTrue, crdv1alpha1.StartedConditionStartedReason, crdv1alpha1.StartedConditionStartedMessage)
+			Expect(k8sClient.Status().Update(ctx, schedulation)).To(Succeed())
+
+			// Reconcile the Schedulation
+			By("Reconciling the created resource")
+			controllerReconciler := &SchedulationReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Check if the Schedulation has not been started
+			schedulation = &crdv1alpha1.Schedulation{}
+			err = k8sClient.Get(ctx, typeNamespacedName, schedulation)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(schedulation.Status.GetStartedCondition().Status).To(Equal(metav1.ConditionFalse))
+		})
+	})
 })
