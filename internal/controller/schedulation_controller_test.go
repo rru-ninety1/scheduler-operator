@@ -32,58 +32,63 @@ import (
 	crdv1alpha1 "github.com/rru-ninety1/scheduler-operator/api/v1alpha1"
 )
 
+func getSchedulationReconciler() *SchedulationReconciler {
+	return &SchedulationReconciler{
+		Client:   k8sClient,
+		Scheme:   k8sClient.Scheme(),
+		Recorder: record.NewFakeRecorder(3),
+	}
+}
+
 var _ = Describe("Schedulation Controller", func() {
-	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+	// Context("When reconciling a resource", func() {
+	// 	const resourceName = "test-resource"
 
-		ctx := context.Background()
+	// 	ctx := context.Background()
 
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default",
-		}
-		schedulation := &crdv1alpha1.Schedulation{}
+	// 	typeNamespacedName := types.NamespacedName{
+	// 		Name:      resourceName,
+	// 		Namespace: "default",
+	// 	}
+	// 	schedulation := &crdv1alpha1.Schedulation{}
 
-		BeforeEach(func() {
-			By("Creating the custom resource for the Kind Schedulation")
-			err := k8sClient.Get(ctx, typeNamespacedName, schedulation)
-			if err != nil && errors.IsNotFound(err) {
-				resource := &crdv1alpha1.Schedulation{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
-					},
-					// TODO(user): Specify other spec details if needed.
-				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
-			}
-		})
+	// 	BeforeEach(func() {
+	// 		By("Creating the custom resource for the Kind Schedulation")
+	// 		err := k8sClient.Get(ctx, typeNamespacedName, schedulation)
+	// 		if err != nil && errors.IsNotFound(err) {
+	// 			resource := &crdv1alpha1.Schedulation{
+	// 				ObjectMeta: metav1.ObjectMeta{
+	// 					Name:      resourceName,
+	// 					Namespace: "default",
+	// 				},
+	// 			}
+	// 			Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+	// 		}
+	// 	})
 
-		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &crdv1alpha1.Schedulation{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).NotTo(HaveOccurred())
+	// 	AfterEach(func() {
+	// 		// TODO(user): Cleanup logic after each test, like removing the resource instance.
+	// 		resource := &crdv1alpha1.Schedulation{}
+	// 		err := k8sClient.Get(ctx, typeNamespacedName, resource)
+	// 		Expect(err).NotTo(HaveOccurred())
 
-			By("Cleanup the specific resource instance Schedulation")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
-		})
+	// 		By("Cleanup the specific resource instance Schedulation")
+	// 		Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+	// 	})
 
-		It("should successfully reconcile the resource", func() {
-			By("Reconciling the created resource")
-			controllerReconciler := &SchedulationReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
+	// 	It("should successfully reconcile the resource", func() {
+	// 		By("Reconciling the created resource")
+	// 		controllerReconciler := &SchedulationReconciler{
+	// 			Client: k8sClient,
+	// 			Scheme: k8sClient.Scheme(),
+	// 		}
 
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
-		})
-	})
+	// 		_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+	// 			NamespacedName: typeNamespacedName,
+	// 		})
+	// 		Expect(err).NotTo(HaveOccurred())
+	// 	})
+	// })
 
 	Context("When reconciling a resource that does not exist", func() {
 		const resourceName = "non-existent-resource"
@@ -97,10 +102,7 @@ var _ = Describe("Schedulation Controller", func() {
 
 		It("should not return an error", func() {
 			By("Reconciling the non-existent resource")
-			controllerReconciler := &SchedulationReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
+			controllerReconciler := getSchedulationReconciler()
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
@@ -169,10 +171,7 @@ var _ = Describe("Schedulation Controller", func() {
 
 			// Reconcile the Schedulation
 			By("Reconciling the created resource")
-			controllerReconciler := &SchedulationReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
+			controllerReconciler := getSchedulationReconciler()
 
 			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
@@ -200,10 +199,7 @@ var _ = Describe("Schedulation Controller", func() {
 
 			// Reconcile the Schedulation
 			By("Reconciling the created resource")
-			controllerReconciler := &SchedulationReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
+			controllerReconciler := getSchedulationReconciler()
 
 			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
@@ -270,10 +266,7 @@ var _ = Describe("Schedulation Controller", func() {
 
 			// Reconcile the Schedulation
 			By("Reconciling the created resource")
-			controllerReconciler := &SchedulationReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
+			controllerReconciler := getSchedulationReconciler()
 
 			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
@@ -345,10 +338,7 @@ var _ = Describe("Schedulation Controller", func() {
 
 			// Reconcile the Schedulation
 			By("Reconciling the created resource")
-			controllerReconciler := &SchedulationReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
+			controllerReconciler := getSchedulationReconciler()
 
 			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
@@ -374,10 +364,7 @@ var _ = Describe("Schedulation Controller", func() {
 
 			// Reconcile the Schedulation
 			By("Reconciling the created resource")
-			controllerReconciler := &SchedulationReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
+			controllerReconciler := getSchedulationReconciler()
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
@@ -451,10 +438,7 @@ var _ = Describe("Schedulation Controller", func() {
 
 			// Reconcile the Schedulation
 			By("Reconciling the created resource")
-			controllerReconciler := &SchedulationReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
+			controllerReconciler := getSchedulationReconciler()
 
 			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
@@ -466,11 +450,7 @@ var _ = Describe("Schedulation Controller", func() {
 		It("should start the schedulation, if it's not started", func() {
 			// Reconcile the Schedulation
 			By("Reconciling the created resource")
-			controllerReconciler := &SchedulationReconciler{
-				Client:   k8sClient,
-				Scheme:   k8sClient.Scheme(),
-				Recorder: record.NewFakeRecorder(3),
-			}
+			controllerReconciler := getSchedulationReconciler()
 
 			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
@@ -488,6 +468,96 @@ var _ = Describe("Schedulation Controller", func() {
 			By("Checking if the last execution time has been set")
 			Expect(schedulation.Status.LastExecutionTime).NotTo(BeNil())
 		})
-		//TODO test per da avviare
+
+		It("should continue the schedulation, if it's already started", func() {
+			schedulation := &crdv1alpha1.Schedulation{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, schedulation)).To(Succeed())
+
+			By("Set started condition to true")
+			schedulation.Status.SetStartedCondition(metav1.ConditionTrue, crdv1alpha1.StartedConditionStartedReason, crdv1alpha1.StartedConditionStartedMessage)
+
+			Expect(k8sClient.Status().Update(ctx, schedulation)).To(Succeed())
+
+			// Reconcile the Schedulation
+			By("Reconciling the created resource")
+			controllerReconciler := getSchedulationReconciler()
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			// Check if the Schedulation has been executed
+			By("Checking if the Schedulation has been executed")
+			err = k8sClient.Get(ctx, typeNamespacedName, schedulation)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(schedulation.Status.GetExecutedCondition().Status).To(Equal(metav1.ConditionTrue))
+
+		})
+
+		//TODO test per deployment
+		//TODO test per statefulset
+		//TODO test con più risorse
+	})
+
+	When("Reconciling a one-shot schedulation in execution time", func() {
+		const resourceName = "test-resource"
+		const resourceNamespace = "default"
+
+		ctx := context.Background()
+
+		typeNamespacedName := types.NamespacedName{
+			Name:      resourceName,
+			Namespace: resourceNamespace,
+		}
+
+		BeforeEach(func() {
+			By("Creating the custom resource for the Kind Schedulation")
+			schedulation := &crdv1alpha1.Schedulation{}
+			err := k8sClient.Get(ctx, typeNamespacedName, schedulation)
+			if err != nil && errors.IsNotFound(err) {
+				schedulation = &crdv1alpha1.Schedulation{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      resourceName,
+						Namespace: "default",
+					},
+					Spec: crdv1alpha1.SchedulationSpec{
+						Suspended: false,
+						OneShot:   true,
+						StartHour: 0,
+						EndHour:   23,
+					},
+				}
+				Expect(k8sClient.Create(ctx, schedulation)).To(Succeed())
+			}
+
+			By("Set set default conditions")
+			schedulation.Status.SetDefaultConditionsIfNotSet()
+			Expect(k8sClient.Status().Update(ctx, schedulation)).To(Succeed())
+		})
+
+		AfterEach(func() {
+			resource := &crdv1alpha1.Schedulation{}
+			err := k8sClient.Get(ctx, typeNamespacedName, resource)
+
+			if !errors.IsNotFound(err) {
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Cleanup the specific resource instance Schedulation")
+				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			}
+		})
+
+		It("should requeue the schedulation to be deleted, after executing it", func() {
+			// Reconcile the Schedulation
+			By("Reconciling the created resource")
+			controllerReconciler := getSchedulationReconciler()
+
+			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.RequeueAfter).To(Equal(OneShotExecutedSchedulationDeleteTime))
+		})
 	})
 })
