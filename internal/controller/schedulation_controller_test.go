@@ -25,8 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	crdv1alpha1 "github.com/rru-ninety1/scheduler-operator/api/v1alpha1"
@@ -494,11 +497,121 @@ var _ = Describe("Schedulation Controller", func() {
 			Expect(schedulation.Status.GetExecutedCondition().Status).To(Equal(metav1.ConditionTrue))
 
 		})
-
-		//TODO test per deployment
-		//TODO test per statefulset
-		//TODO test con più risorse
 	})
+
+	When("Reconciling a schedulation with deployment in execution time", func() {
+		const resourceName = "test-resource"
+		const resourceNamespace = "default"
+
+		ctx := context.Background()
+
+		typeNamespacedName := types.NamespacedName{
+			Name:      resourceName,
+			Namespace: resourceNamespace,
+		}
+
+		const deploymentName = "test-deployment"
+		const deploymentNamespace = "default"
+
+		BeforeEach(func() {
+			By("Creating the deployment")
+			deployment := &appsv1.Deployment{}
+			err := k8sClient.Get(ctx, types.NamespacedName{
+				Name:      deploymentName,
+				Namespace: deploymentNamespace,
+			}, deployment)
+			if err != nil && errors.IsNotFound(err) {
+				deployment = &appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      deploymentName,
+						Namespace: deploymentNamespace,
+					},
+					Spec: appsv1.DeploymentSpec{
+						Replicas: pointer.Int32(1),
+						Selector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"app": "test",
+							},
+						},
+						Template: corev1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									"app": "test",
+								},
+							},
+							Spec: corev1.PodSpec{
+								Containers: []corev1.Container{
+									{
+										Name:  "test",
+										Image: "nginx",
+									},
+								},
+							},
+						},
+					},
+				}
+				Expect(k8sClient.Create(ctx, deployment)).To(Succeed())
+			}
+
+			By("Creating the custom resource for the Kind Schedulation")
+			schedulation := &crdv1alpha1.Schedulation{}
+			err = k8sClient.Get(ctx, typeNamespacedName, schedulation)
+			if err != nil && errors.IsNotFound(err) {
+				schedulation = &crdv1alpha1.Schedulation{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      resourceName,
+						Namespace: "default",
+					},
+					Spec: crdv1alpha1.SchedulationSpec{
+						Suspended: false,
+						OneShot:   true,
+						StartHour: 0,
+						EndHour:   23,
+						Resources: []crdv1alpha1.ScheduledResource{
+							{
+								Type:         crdv1alpha1.ResourceTypeDeployment,
+								ReplicaCount: 2,
+								Namespace:    deploymentNamespace,
+								Name:         deploymentName,
+								Order:        1,
+							}},
+					},
+				}
+				Expect(k8sClient.Create(ctx, schedulation)).To(Succeed())
+			}
+
+			By("Set set default conditions")
+			schedulation.Status.SetDefaultConditionsIfNotSet()
+			Expect(k8sClient.Status().Update(ctx, schedulation)).To(Succeed())
+		})
+
+		AfterEach(func() {
+			// Delete the deployment
+			By("Deleting the deployment")
+			deployment := &appsv1.Deployment{}
+
+			err := k8sClient.Get(ctx, types.NamespacedName{
+				Name:      deploymentName,
+				Namespace: deploymentNamespace,
+			}, deployment)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(k8sClient.Delete(ctx, deployment)).To(Succeed())
+
+			// Delete the schedulation
+			resource := &crdv1alpha1.Schedulation{}
+			err = k8sClient.Get(ctx, typeNamespacedName, resource)
+
+			if !errors.IsNotFound(err) {
+				Expect(err).NotTo(HaveOccurred())
+
+				By("Cleanup the specific resource instance Schedulation")
+				Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			}
+		})
+	})
+	//TODO test per deployment
+	//TODO test per statefulset
+	//TODO test con più risorse
 
 	When("Reconciling a one-shot schedulation in execution time", func() {
 		const resourceName = "test-resource"
