@@ -67,6 +67,11 @@ func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	// Set default status conditions if not set
 	schedulation.Status.SetDefaultConditionsIfNotSet()
 
+	// If resources is nil, set it to empty slice
+	if schedulation.Spec.Resources == nil {
+		schedulation.Spec.Resources = []crdv1alpha1.ScheduledResource{}
+	}
+
 	if schedulation.Spec.OneShot {
 		// The schedulation is one shot
 		// Get executed condition
@@ -145,7 +150,6 @@ func (r *SchedulationReconciler) reconcileExecutionTime(ctx context.Context, log
 
 // runSchedulation runs the Schedulation
 func (r *SchedulationReconciler) runSchedulation(ctx context.Context, log logr.Logger, schedulation *crdv1alpha1.Schedulation) (ctrl.Result, error) {
-
 	// Sort the resources by order
 	sort.Slice(schedulation.Spec.Resources, func(i, j int) bool {
 		return schedulation.Spec.Resources[i].Order < schedulation.Spec.Resources[j].Order

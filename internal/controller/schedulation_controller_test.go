@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -415,7 +416,7 @@ var _ = Describe("Schedulation Controller", func() {
 					Spec: crdv1alpha1.SchedulationSpec{
 						Suspended: false,
 						StartHour: 0,
-						EndHour:   24,
+						EndHour:   23,
 					},
 				}
 				Expect(k8sClient.Create(ctx, schedulation)).To(Succeed())
@@ -438,8 +439,55 @@ var _ = Describe("Schedulation Controller", func() {
 			}
 		})
 
-		//TODO test per già eseguito
-		//TODO test per avviato ma non eseguito
+		It("should requeue the schedulation, if it's already executed", func() {
+			schedulation := &crdv1alpha1.Schedulation{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, schedulation)).To(Succeed())
+
+			By("Set started and executed condition to true")
+			schedulation.Status.SetStartedCondition(metav1.ConditionTrue, crdv1alpha1.StartedConditionStartedReason, crdv1alpha1.StartedConditionStartedMessage)
+			schedulation.Status.SetExecutedCondition(metav1.ConditionTrue, crdv1alpha1.ExecutedConditionExecutedReason, crdv1alpha1.ExecutedConditionExecutedMessage)
+
+			Expect(k8sClient.Status().Update(ctx, schedulation)).To(Succeed())
+
+			// Reconcile the Schedulation
+			By("Reconciling the created resource")
+			controllerReconciler := &SchedulationReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.RequeueAfter).To(Equal(DefaultRequeueTime))
+		})
+
+		It("should start the schedulation, if it's not started", func() {
+			// Reconcile the Schedulation
+			By("Reconciling the created resource")
+			controllerReconciler := &SchedulationReconciler{
+				Client:   k8sClient,
+				Scheme:   k8sClient.Scheme(),
+				Recorder: record.NewFakeRecorder(3),
+			}
+
+			result, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.RequeueAfter).To(Equal(DefaultRequeueTime))
+
+			// Check if the Schedulation has been started
+			By("Checking if the Schedulation has been started")
+			schedulation := &crdv1alpha1.Schedulation{}
+			err = k8sClient.Get(ctx, typeNamespacedName, schedulation)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(schedulation.Status.GetStartedCondition().Status).To(Equal(metav1.ConditionTrue))
+
+			By("Checking if the last execution time has been set")
+			Expect(schedulation.Status.LastExecutionTime).NotTo(BeNil())
+		})
 		//TODO test per da avviare
 	})
 })
