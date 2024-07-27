@@ -1,0 +1,27 @@
+# permissions for end users to view schedulations.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: schedulation-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: scheduler-operator
+    app.kubernetes.io/part-of: scheduler-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: schedulation-viewer-role
+rules:
+- apiGroups:
+  - crd.rru.io
+  resources:
+  - schedulations
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - crd.rru.io
+  resources:
+  - schedulations/status
+  verbs:
+  - get

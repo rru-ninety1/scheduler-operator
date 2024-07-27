@@ -1,0 +1,16 @@
+apiVersion: crd.rru.io/v1alpha1
+kind: Schedulation
+metadata:
+  name: example-schedulation
+  namespace: default
+spec:
+  suspended: false
+  oneShot: false
+  startHour: 9
+  endHour: 19
+  resources:
+    - name: nginx-deployment
+      namespace: default
+      type: Deployment    
+      replicaCount: 3
+      order: 1
