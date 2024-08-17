@@ -43,7 +43,8 @@ type SchedulationReconciler struct {
 const (
 	OneShotExecutedSchedulationDeleteTime = time.Minute * 2
 	DefaultRequeueTime                    = time.Minute * 10
-	NextResourceWaitTime                  = time.Second * 30
+	ResourceUpdateWaitTime                = time.Second * 5
+	MaxWaitCount                          = 10
 )
 
 // +kubebuilder:rbac:groups=crd.rru.io,resources=schedulations,verbs=get;list;watch;create;update;patch;delete
@@ -159,9 +160,7 @@ func (r *SchedulationReconciler) runSchedulation(ctx context.Context, log logr.L
 	for _, resource := range schedulation.Spec.Resources {
 		if resource.Type == crdv1alpha1.ResourceTypeDeployment {
 			// Reconcile the Schedulation for Deployment
-			deploymentUpdated := false
-			err := error(nil)
-			if deploymentUpdated, err = r.reconcileDeploymentSchedulation(ctx, log, &resource); err != nil {
+			if err := r.reconcileDeploymentSchedulation(ctx, log, &resource); err != nil {
 				// Set error condition
 				schedulation.Status.SetErrorCondition(metav1.ConditionTrue, crdv1alpha1.ErrorConditionErrorReason, err.Error())
 
@@ -173,16 +172,9 @@ func (r *SchedulationReconciler) runSchedulation(ctx context.Context, log logr.L
 				return ctrl.Result{}, err
 			}
 
-			if deploymentUpdated {
-				// Wait for the next resource
-				time.Sleep(NextResourceWaitTime)
-			}
-
 		} else if resource.Type == crdv1alpha1.ResourceTypeStatefulSet {
 			// Reconcile the Schedulation for StatefulSet
-			statefulSetUpdated := false
-			err := error(nil)
-			if statefulSetUpdated, err = r.reconcileStatefulSetSchedulation(ctx, log, &resource); err != nil {
+			if err := r.reconcileStatefulSetSchedulation(ctx, log, &resource); err != nil {
 				// Set error condition
 				schedulation.Status.SetErrorCondition(metav1.ConditionTrue, "Error", err.Error())
 
@@ -192,11 +184,6 @@ func (r *SchedulationReconciler) runSchedulation(ctx context.Context, log logr.L
 				}
 
 				return ctrl.Result{}, err
-			}
-
-			if statefulSetUpdated {
-				// Wait for the next resource
-				time.Sleep(NextResourceWaitTime)
 			}
 		}
 	}
@@ -227,8 +214,7 @@ func (r *SchedulationReconciler) runSchedulation(ctx context.Context, log logr.L
 }
 
 // reconcileDeploymentSchedulation reconciles the Schedulation for Deployment.
-// Returns true if the deployment was updated
-func (r *SchedulationReconciler) reconcileDeploymentSchedulation(ctx context.Context, log logr.Logger, resource *crdv1alpha1.ScheduledResource) (bool, error) {
+func (r *SchedulationReconciler) reconcileDeploymentSchedulation(ctx context.Context, log logr.Logger, resource *crdv1alpha1.ScheduledResource) error {
 	// Get the deployment
 	deployment := &appsv1.Deployment{}
 	objectKey := client.ObjectKey{Namespace: resource.Namespace, Name: resource.Name}
@@ -236,7 +222,7 @@ func (r *SchedulationReconciler) reconcileDeploymentSchedulation(ctx context.Con
 	if err := r.Get(ctx, objectKey, deployment); err != nil {
 		log.Error(err, "Unable to fetch Deployment", "deployment", objectKey)
 
-		return false, client.IgnoreNotFound(err)
+		return client.IgnoreNotFound(err)
 	}
 
 	if deployment.Spec.Replicas != nil && *deployment.Spec.Replicas != resource.ReplicaCount {
@@ -246,19 +232,38 @@ func (r *SchedulationReconciler) reconcileDeploymentSchedulation(ctx context.Con
 		if err := r.Update(ctx, deployment); err != nil {
 			log.Error(err, "Unable to update Deployment", "deployment", objectKey)
 
-			return false, err
+			return err
 		}
 
-		// Return true: the deployment was updated
-		return true, nil
+		deploymentUpdated := false
+		waitCount := 0
+		// Wait for the deployment to be updated
+		for !deploymentUpdated {
+			time.Sleep(ResourceUpdateWaitTime)
+			waitCount++
+
+			// Check if the deployment replicas are updated
+			if err := r.Get(ctx, objectKey, deployment); err != nil {
+				log.Error(err, "Unable to fetch Deployment", "deployment", objectKey)
+
+				return client.IgnoreNotFound(err)
+			}
+
+			if deployment.Status.Replicas == resource.ReplicaCount {
+				deploymentUpdated = true
+			} else if waitCount >= MaxWaitCount {
+				// Max wait count reached
+				log.Info("Max wait count reached. Deployment replicas not updated", "deployment", objectKey)
+				deploymentUpdated = true
+			}
+		}
 	}
 
-	// Return false: the deployment was not updated
-	return false, nil
+	return nil
 }
 
 // reconcileStatefulSetSchedulation reconciles the Schedulation for StatefulSet
-func (r *SchedulationReconciler) reconcileStatefulSetSchedulation(ctx context.Context, log logr.Logger, resource *crdv1alpha1.ScheduledResource) (bool, error) {
+func (r *SchedulationReconciler) reconcileStatefulSetSchedulation(ctx context.Context, log logr.Logger, resource *crdv1alpha1.ScheduledResource) error {
 	// Get the statefulset
 	statefulset := &appsv1.StatefulSet{}
 	objectKey := client.ObjectKey{Namespace: resource.Namespace, Name: resource.Name}
@@ -266,7 +271,7 @@ func (r *SchedulationReconciler) reconcileStatefulSetSchedulation(ctx context.Co
 	if err := r.Get(ctx, objectKey, statefulset); err != nil {
 		log.Error(err, "Unable to fetch StatefulSet", "statefulset", objectKey)
 
-		return false, client.IgnoreNotFound(err)
+		return client.IgnoreNotFound(err)
 	}
 
 	if statefulset.Spec.Replicas != nil && *statefulset.Spec.Replicas != resource.ReplicaCount {
@@ -276,15 +281,34 @@ func (r *SchedulationReconciler) reconcileStatefulSetSchedulation(ctx context.Co
 		if err := r.Update(ctx, statefulset); err != nil {
 			log.Error(err, "Unable to update StatefulSet", "statefulset", objectKey)
 
-			return false, err
+			return err
 		}
 
-		// Return true: the statefulset was updated
-		return true, nil
+		statefulsetUpdated := false
+		waitCount := 0
+		// Wait for the statefulset to be updated
+		for !statefulsetUpdated {
+			time.Sleep(ResourceUpdateWaitTime)
+			waitCount++
+
+			// Check if the statefulset replicas are updated
+			if err := r.Get(ctx, objectKey, statefulset); err != nil {
+				log.Error(err, "Unable to fetch StatefulSet", "statefulset", objectKey)
+
+				return client.IgnoreNotFound(err)
+			}
+
+			if statefulset.Status.Replicas == resource.ReplicaCount {
+				statefulsetUpdated = true
+			} else if waitCount >= MaxWaitCount {
+				// Max wait count reached
+				log.Info("Max wait count reached. StatefulSet replicas not updated", "statefulset", objectKey)
+				statefulsetUpdated = true
+			}
+		}
 	}
 
-	// Return false: the statefulset was not updated
-	return false, nil
+	return nil
 }
 
 // reconcileNotExecutionTime reconciles the Schedulation during not execution time

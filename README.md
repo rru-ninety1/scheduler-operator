@@ -2,7 +2,7 @@
 Kubernetes operator to schedule Deployment and StatefulSet replica counts.
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+This project is a Kubernetes operator that allows you to schedule the scaling up or down of Deployments and StatefulSets.
 
 ## Getting Started
 
