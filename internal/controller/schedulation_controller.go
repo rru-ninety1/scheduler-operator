@@ -106,15 +106,27 @@ func (r *SchedulationReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	// The schedulation is not suspended
-	// Get current hour
-	currentHour := int32(time.Now().Hour())
-
-	if schedulation.Spec.StartHour <= currentHour && schedulation.Spec.EndHour >= currentHour {
-		// Now is beetwen the start and end time of the schedulation
+	if checkExecutionTime(schedulation) {
+		// It's execution time
 		return r.reconcileExecutionTime(ctx, log, schedulation)
 	} else {
 		return r.reconcileNotExecutionTime(ctx, log, schedulation)
 	}
+}
+
+func checkExecutionTime(schedulation *crdv1alpha1.Schedulation) bool {
+	// Get now time
+	now := time.Now()
+
+	// Get schedulation start and end time
+	schedulationStartTime := time.Date(now.Year(), now.Month(), now.Day(), int(schedulation.Spec.StartHour), int(schedulation.Spec.StartMinute), 0, 0, now.Location())
+	schedulationEndTime := time.Date(now.Year(), now.Month(), now.Day(), int(schedulation.Spec.EndHour), int(schedulation.Spec.EndMinute), 0, 0, now.Location())
+
+	if now.After(schedulationStartTime) && now.Before(schedulationEndTime) {
+		return true
+	}
+
+	return false
 }
 
 // reconcileExecutionTime reconciles the Schedulation during execution time

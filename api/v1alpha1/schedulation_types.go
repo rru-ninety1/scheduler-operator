@@ -96,10 +96,20 @@ type SchedulationSpec struct {
 	// +kubebuilder:validation:Maximum=23
 	StartHour int32 `json:"startHour,omitempty"`
 
+	// Schedulation start minute
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=59
+	StartMinute int32 `json:"startMinute,omitempty"`
+
 	// Schedulation end hour
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=23
 	EndHour int32 `json:"endHour,omitempty"`
+
+	// Schedulation end minute
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=59
+	EndMinute int32 `json:"endMinute,omitempty"`
 
 	// Resources to control
 	Resources []ScheduledResource `json:"resources,omitempty"`

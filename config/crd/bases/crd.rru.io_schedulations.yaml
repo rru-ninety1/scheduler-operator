@@ -45,6 +45,12 @@ spec:
                 maximum: 23
                 minimum: 0
                 type: integer
+              endMinute:
+                description: Schedulation end minute
+                format: int32
+                maximum: 59
+                minimum: 0
+                type: integer
               oneShot:
                 description: Schedulation must be executed only one time
                 type: boolean
@@ -81,6 +87,12 @@ spec:
                 description: Schedulation start hour
                 format: int32
                 maximum: 23
+                minimum: 0
+                type: integer
+              startMinute:
+                description: Schedulation start minute
+                format: int32
+                maximum: 59
                 minimum: 0
                 type: integer
               suspended:
